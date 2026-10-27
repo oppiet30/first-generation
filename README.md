@@ -107,6 +107,30 @@ print('Peak living population:', max(int(row['living']) for row in rows))
 
 No new migration or per-tick storage is required.
 
+## Statistics dashboard
+
+For Dell's already-running Apache/PHP-FPM stack, use the [Apache deployment guide](docs/apache-dashboard.md) and reviewed virtual-host template in `deploy/apache/first-generation.conf`. It prepares `first-generation.local` on the existing web server; the development-server commands below are optional previews.
+
+After migrations 001–006 and Composer installation, serve only the `public/` directory:
+
+```sh
+php -S 127.0.0.1:8080 -t public public/router.php
+```
+
+Open `http://127.0.0.1:8080/` on that machine. For Dell's trusted LAN, bind to its LAN address instead:
+
+```sh
+php -S 10.1.10.138:8080 -t public public/router.php
+```
+
+Then open `http://10.1.10.138:8080/` from the LAN. The built-in PHP server is suitable for this local inspection; an always-running deployment should use a configured PHP web server. This page has no login and is intended for a trusted local network, not public internet exposure. Always keep the document root at `public/` so `.env`, source and database files are not served. No firewall or system-service changes are included.
+
+The dashboard has interactive population, yearly birth/death, living age/sex, age-at-death, infant-death and generation graphs. Hover, tap or use arrow keys on a focused graph to inspect values. World ID and inclusive From/To day filters update all views; Full history resets the day range. Living-age distributions and generation counts are calculated as of the selected end day, including people who were alive then but died later. Birth/death bars and death records use events inside the selected interval. Partial edge years are labeled in the page guidance. Generation is one plus the greater parent generation; founders are generation 1.
+
+CSV links on every graph download its underlying data. The People CSV reflects the selected end day and adds a generation column; the command-line people export continues to reflect the world's current day. Recent events show the latest 20 records in the selected range. Empty graphs and invalid/missing-world errors have explicit states. The page does not advance time, edit records, or contact external chart services. It reads a consistent snapshot using the existing database configuration; no new migration or JavaScript dependency is needed.
+
+Population curves are reconstructed from retained person birth/death dates, not saved tick snapshots. Recorded ages at death are **not life expectancy**: living people have incomplete lifespans, and these illustrative mortality rates are not historically calibrated.
+
 ## Tests
 
 ```sh
@@ -123,6 +147,8 @@ php tests/CreateWorldIntegrationTest.php
 php tests/WorldHistoryIntegrationTest.php
 # With migrations 001–006 applied; creates and removes isolated CSV fixtures:
 php tests/CsvExportIntegrationTest.php
+# With migrations 001–006 applied; includes a temporary local HTTP server:
+php tests/StatisticsIntegrationTest.php
 ```
 
 GitHub Actions runs PHP syntax checks, deterministic tests, mortality and family-tree regressions, and a 10,000-day multi-generation integration scenario on MariaDB. It runs on pull requests, pushes to main or feature/mortality-survival, and manual dispatch. Require green checks for the latest commit before considering a merge.

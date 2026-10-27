@@ -1,0 +1,124 @@
+<?php
+declare(strict_types=1);
+namespace FirstGeneration\Simulation;
+
+use InvalidArgumentException;
+use PDO;
+use RuntimeException;
+
+final class PopulationStatistics
+{
+    public function __construct(private PDO $db) {}
+
+    public function report(int $worldId, int $from = 0, ?int $to = null): array
+    {
+        $this->db->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+        $this->db->beginTransaction();
+        try {
+            $q = $this->db->prepare('SELECT id,name,current_day,status FROM worlds WHERE id=?');
+            $q->execute([$worldId]);
+            $world = $q->fetch();
+            if (!$world) { throw new RuntimeException('World not found'); }
+            $to ??= (int)$world['current_day'];
+            if ($from < 0 || $from > $to || $to > (int)$world['current_day']) {
+                throw new InvalidArgumentException('Choose days between 0 and the current world day, with From no later than To.');
+            }
+            $q = $this->db->prepare('SELECT p.id,p.name,p.sex,p.birth_day,p.initial_age_days,p.death_day,p.mother_id,p.father_id,d.cause FROM people p LEFT JOIN deaths d ON d.person_id=p.id AND d.world_id=p.world_id WHERE p.world_id=? ORDER BY p.id');
+            $q->execute([$worldId]);
+            $people = $q->fetchAll();
+            $q = $this->db->prepare('SELECT e.day,e.event_type,e.details,e.person_id,p.name FROM world_events e LEFT JOIN people p ON p.id=e.person_id AND p.world_id=e.world_id WHERE e.world_id=? AND e.day>=? AND e.day<=? ORDER BY e.day DESC,e.id DESC LIMIT 20');
+            $q->execute([$worldId,$from,$to]);
+            $events = $q->fetchAll();
+            $this->db->commit();
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) { $this->db->rollBack(); }
+            throw $error;
+        }
+        $world['id'] = (int)$world['id'];
+        $world['current_day'] = (int)$world['current_day'];
+        $changes = $byId = [];
+        foreach ($people as $p) {
+            $byId[(int)$p['id']] = $p;
+            $day = (int)$p['birth_day'];
+            $changes[$day]['added'] = ($changes[$day]['added'] ?? 0) + 1;
+            if ($p['mother_id'] !== null) { $changes[$day]['births'] = ($changes[$day]['births'] ?? 0) + 1; }
+            if ($p['death_day'] !== null) {
+                $day = (int)$p['death_day'];
+                $changes[$day]['deaths'] = ($changes[$day]['deaths'] ?? 0) + 1;
+                $cause = in_array($p['cause'],['natural','childbirth'],true) ? $p['cause'] : 'other';
+                $changes[$day][$cause] = ($changes[$day][$cause] ?? 0) + 1;
+            }
+        }
+        $daily = $yearly = [];
+        $total = $living = $births = $deaths = $rangeBirths = $rangeDeaths = 0;
+        for ($day = 0; $day <= $to; $day++) {
+            $c = $changes[$day] ?? [];
+            $total += $c['added'] ?? 0;
+            $living += ($c['added'] ?? 0) - ($c['deaths'] ?? 0);
+            $births += $c['births'] ?? 0;
+            $deaths += $c['deaths'] ?? 0;
+            if ($day < $from) { continue; }
+            $year = $day === 0 ? 0 : intdiv($day-1,365)+1;
+            $daily[] = ['world_id'=>$worldId,'day'=>$day,'year'=>$year,'day_of_year'=>$day === 0 ? 0 : ($day-1)%365+1,
+                'total_people'=>$total,'living'=>$living,'births'=>$c['births'] ?? 0,'deaths'=>$c['deaths'] ?? 0,
+                'cumulative_births'=>$births,'cumulative_deaths'=>$deaths,'natural_deaths'=>$c['natural'] ?? 0,
+                'childbirth_deaths'=>$c['childbirth'] ?? 0,'other_deaths'=>$c['other'] ?? 0];
+            $yearly[$year] ??= ['year'=>$year,'from_day'=>$day,'to_day'=>$day,'births'=>0,'deaths'=>0];
+            $yearly[$year]['to_day'] = $day;
+            $yearly[$year]['births'] += $c['births'] ?? 0;
+            $yearly[$year]['deaths'] += $c['deaths'] ?? 0;
+            $rangeBirths += $c['births'] ?? 0;
+            $rangeDeaths += $c['deaths'] ?? 0;
+        }
+        $ages = [];
+        for ($age = 0; $age <= 90; $age += 10) {
+            $ages[] = ['band'=>$age === 90 ? '90+' : $age.'–'.($age+9),'male'=>0,'female'=>0];
+        }
+        $deathAges = array_map(static fn(string $label): array => ['band'=>$label,'count'=>0],
+            ['Under 1 year','1–4','5–17','18–34','35–49','50–64','65–79','80+']);
+        $infants = array_map(static fn(string $label): array => ['band'=>$label,'count'=>0],
+            ['0–29 days','30–89 days','90–179 days','180–364 days']);
+        $generationCache = $visiting = [];
+        $generation = function (int $id) use (&$generation,&$generationCache,&$visiting,$byId): int {
+            if (isset($generationCache[$id])) { return $generationCache[$id]; }
+            if (isset($visiting[$id])) { throw new RuntimeException('Genealogy contains a cycle'); }
+            $visiting[$id] = true;
+            $parentDepths = [];
+            foreach (['mother_id','father_id'] as $key) {
+                $parent = $byId[$id][$key];
+                if ($parent !== null) {
+                    if (!isset($byId[(int)$parent])) { throw new RuntimeException('Parent missing from world'); }
+                    $parentDepths[] = $generation((int)$parent);
+                }
+            }
+            unset($visiting[$id]);
+            return $generationCache[$id] = $parentDepths ? 1+max($parentDepths) : 1;
+        };
+        $generations = $deathRecords = $personRows = [];
+        foreach ($people as $p) {
+            if ((int)$p['birth_day'] > $to) { continue; }
+            $dead = $p['death_day'] !== null && (int)$p['death_day'] <= $to;
+            $age = max(0,($dead ? (int)$p['death_day'] : $to)-(int)$p['birth_day']+(int)$p['initial_age_days']);
+            $years = intdiv($age,365);
+            $gen = $generation((int)$p['id']);
+            $generations[$gen] ??= ['generation'=>$gen,'living'=>0,'deceased'=>0];
+            $generations[$gen][$dead ? 'deceased' : 'living']++;
+            $personRows[] = ['world_id'=>$worldId,'person_id'=>(int)$p['id'],'name'=>$p['name'],'sex'=>$p['sex'],
+                'birth_day'=>(int)$p['birth_day'],'initial_age_days'=>(int)$p['initial_age_days'],
+                'death_day'=>$dead ? (int)$p['death_day'] : null,'death_cause'=>$dead ? ($p['cause'] ?? 'unknown') : '',
+                'age_days'=>$age,'age_years'=>$years,'mother_id'=>$p['mother_id'],'father_id'=>$p['father_id'],'generation'=>$gen];
+            if (!$dead) { $ages[min(9,intdiv($years,10))][$p['sex']]++; }
+            elseif ((int)$p['death_day'] >= $from) {
+                $bucket = match (true) { $years < 1=>0,$years < 5=>1,$years < 18=>2,$years < 35=>3,$years < 50=>4,$years < 65=>5,$years < 80=>6,default=>7 };
+                $deathAges[$bucket]['count']++;
+                if ($age < 365) { $infants[$age < 30 ? 0 : ($age < 90 ? 1 : ($age < 180 ? 2 : 3))]['count']++; }
+                $deathRecords[] = ['person_id'=>(int)$p['id'],'name'=>$p['name'],'day'=>(int)$p['death_day'],'age_days'=>$age,'age_years'=>$years,'cause'=>$p['cause'] ?? 'unknown'];
+            }
+        }
+        ksort($generations);
+        return ['world'=>$world,'from'=>$from,'to'=>$to,'summary'=>['living'=>$living,'births'=>$births,'deaths'=>$deaths,
+            'total_people'=>$total,'generations'=>count($generations),'range_births'=>$rangeBirths,'range_deaths'=>$rangeDeaths],
+            'daily'=>$daily,'yearly'=>array_values($yearly),'ages'=>$ages,'death_ages'=>$deathAges,'infants'=>$infants,
+            'generations'=>array_values($generations),'deaths'=>$deathRecords,'people'=>$personRows,'events'=>$events];
+    }
+}
