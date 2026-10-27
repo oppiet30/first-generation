@@ -77,6 +77,36 @@ Supported types are `founder`, `partnership`, `conception`, `birth`, `death` and
 
 Invalid arguments exit with code 2; a missing world exits with code 1. Success, including an empty result, exits with code 0. This report uses the existing `world_events` table and needs no new migration.
 
+## CSV exports for Python and spreadsheets
+
+Export population history or individual lifespans without advancing time:
+
+```sh
+php bin/export-csv.php 1 > world-1-daily.csv
+php bin/export-csv.php 1 --from=10000 --to=20000 > world-1-days-10000-20000.csv
+php bin/export-csv.php 1 --report=people > world-1-people.csv
+```
+
+Daily exports contain one end-of-day row per day, including day zero. A world at day 20,000 produces 20,001 data rows plus the header. These are **reconstructed population figures**, not saved tick snapshots: the database stores people, dates, events and the current world clock. Past random states, health, hunger and energy values are not recoverable from this export. Reconstruction assumes the retained birth/death records have not been deleted or retroactively edited.
+
+Daily columns are `world_id`, `day`, `year`, `day_of_year`, `total_people`, `living`, `births`, `deaths`, `cumulative_births`, `cumulative_deaths`, `natural_deaths`, `childbirth_deaths` and `other_deaths`. Birth counts exclude founders and follow the population report's mother-reference rule. Cause counts are daily; `other_deaths` includes missing or unrecognized causes. `total_people` includes founders and all people born by that day, including those who have died. The initial day zero uses year/day-of-year 0/0; later days use the simulation calendar.
+
+Day bounds are inclusive, must not exceed the current day, and apply only to the daily report. Cumulative totals include earlier days even when exporting a later range. Each export reads a consistent database snapshot. Invalid arguments exit with code 2; a missing world exits with code 1. Data goes to standard output, errors to standard error; check the exit code before using a redirected file.
+
+The people report includes person ID, name, sex, birth day, initial age in days, death day/cause, exact age in days, whole age in years and parent IDs. Ages for deceased people stop at death; living ages use the current world day. Blank death fields mean alive; missing recorded causes show `unknown`. Formula-like names are prefixed with an apostrophe to keep them literal in spreadsheet software. Use this report to analyze infant deaths and age-at-death distributions.
+
+Python example:
+
+```python
+import csv
+
+with open('world-1-daily.csv', newline='', encoding='utf-8') as source:
+    rows = list(csv.DictReader(source))
+print('Peak living population:', max(int(row['living']) for row in rows))
+```
+
+No new migration or per-tick storage is required.
+
 ## Tests
 
 ```sh
@@ -91,6 +121,8 @@ php tests/MortalityPartnershipIntegrationTest.php
 php tests/CreateWorldIntegrationTest.php
 # With migrations 001–006 applied; creates and removes isolated history fixtures:
 php tests/WorldHistoryIntegrationTest.php
+# With migrations 001–006 applied; creates and removes isolated CSV fixtures:
+php tests/CsvExportIntegrationTest.php
 ```
 
 GitHub Actions runs PHP syntax checks, deterministic tests, mortality and family-tree regressions, and a 10,000-day multi-generation integration scenario on MariaDB. It runs on pull requests, pushes to main or feature/mortality-survival, and manual dispatch. Require green checks for the latest commit before considering a merge.

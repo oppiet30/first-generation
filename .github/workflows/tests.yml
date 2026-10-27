@@ -54,6 +54,7 @@ jobs:
           php bin/create-world.php "Genesis World" 1337
           php tests/CreateWorldIntegrationTest.php
           php tests/WorldHistoryIntegrationTest.php
+          php tests/CsvExportIntegrationTest.php
           php bin/family-tree.php 1
           php tests/FamilyTreeIntegrationTest.php
           php tests/MortalityIntegrationTest.php
