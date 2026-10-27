@@ -109,6 +109,8 @@ No new migration or per-tick storage is required.
 
 ## Statistics dashboard
 
+For Dell's already-running Apache/PHP-FPM stack, use the [Apache deployment guide](docs/apache-dashboard.md) and reviewed virtual-host template in `deploy/apache/first-generation.conf`. It prepares `first-generation.local` on the existing web server; the development-server commands below are optional previews.
+
 After migrations 001–006 and Composer installation, serve only the `public/` directory:
 
 ```sh
