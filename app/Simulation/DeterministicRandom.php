@@ -14,7 +14,9 @@ final class DeterministicRandom
     {
         if ($maxExclusive <= 0) { throw new InvalidArgumentException('Maximum must be positive'); }
         $this->state = (int)(($this->state * 1103515245 + 12345) & 0x7fffffff);
-        return $this->state % $maxExclusive;
+        // Discard low LCG bits: their short cycles correlate with the
+        // daily conception check and can make every newborn the same sex.
+        return (($this->state >> 8) % $maxExclusive);
     }
 
     public function state(): int { return $this->state; }
