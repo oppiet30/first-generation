@@ -38,7 +38,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y php-cli php-mysql mariadb-client composer
       - name: PHP syntax
-        run: find app bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: find app bin public tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Composer and deterministic tests
         run: |
           composer install --no-interaction --no-progress
@@ -55,6 +55,7 @@ jobs:
           php tests/CreateWorldIntegrationTest.php
           php tests/WorldHistoryIntegrationTest.php
           php tests/CsvExportIntegrationTest.php
+          php tests/StatisticsIntegrationTest.php
           php bin/family-tree.php 1
           php tests/FamilyTreeIntegrationTest.php
           php tests/MortalityIntegrationTest.php

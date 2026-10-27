@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Read-only population statistics for the First Generation simulation.">
+  <title>First Generation · Statistics</title>
+  <link rel="stylesheet" href="assets/dashboard.css">
+  <script src="assets/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="masthead"><a class="brand" href="./"><span class="mark" aria-hidden="true">F<span>G</span></span><span>First Generation<small>POPULATION OBSERVATORY</small></span></a><span class="readonly"><span aria-hidden="true"></span> Read-only view</span></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">A WORLD, ONE DAY AT A TIME</p><h1>The shape of a population.</h1><p class="lead">Follow the lives, families, and generations of a two-founder world.</p></div><div class="world-stamp"><span id="world-name">World statistics</span><strong id="world-clock">Awaiting data</strong><span id="world-status">No simulation controls</span></div></section>
+    <form id="filters" class="filters" aria-label="Statistics filters">
+      <label>World ID<input id="world" name="world" type="number" min="1" step="1" value="1" required></label>
+      <label>From day<input id="from" name="from" type="number" min="0" step="1" value="0" required></label>
+      <label>To day<input id="to" name="to" type="number" min="0" step="1" placeholder="Current day"></label>
+      <button id="apply" type="submit">Apply range <span aria-hidden="true">↗</span></button>
+      <button id="reset" type="button" class="secondary">Full history</button>
+      <p id="range-caption">Choose a world and an inclusive day range.</p>
+    </form>
+    <p id="message" class="message" role="status" aria-live="polite">Loading statistics…</p>
+    <section id="results" hidden aria-label="Population statistics">
+      <div class="metrics">
+        <article><span>Living population</span><strong id="living">—</strong><small>At selected end day</small></article>
+        <article><span>Total births</span><strong id="births">—</strong><small>Through end day · excludes founders</small></article>
+        <article><span>Recorded deaths</span><strong id="deaths">—</strong><small>Through selected end day</small></article>
+        <article><span>Generations</span><strong id="generations">—</strong><small>Founders are generation 1</small></article>
+      </div>
+      <div class="section-title"><h2>Population through time</h2><span id="interval-summary"></span></div>
+      <article class="panel wide"><div class="panel-head"><div><p class="eyebrow">01 / POPULATION</p><h3>Lives in the world</h3><p>Living people at the end of each simulated day.</p></div><a class="download" data-report="daily" href="#">↓ CSV<span class="sr-only"> · daily population</span></a></div><div id="population-chart" class="chart" tabindex="0" role="group" aria-label="Population line graph. Use left and right arrow keys to inspect days."></div><div class="legend"><span><i class="teal"></i>Living population</span><span class="chart-hint">Hover, tap, or use arrow keys to inspect</span></div></article>
+      <div class="chart-grid">
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">02 / CHANGE</p><h3>Births &amp; deaths by year</h3><p>Events inside the selected range. Edge years may be partial.</p></div><a class="download" data-report="yearly" href="#">↓ CSV<span class="sr-only"> · yearly births and deaths</span></a></div><div id="yearly-chart" class="chart" tabindex="0" role="group" aria-label="Yearly births and deaths. Use arrow keys to inspect."></div><div class="legend"><span><i class="teal"></i>Births</span><span><i class="rust"></i>Deaths</span></div></article>
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">03 / LIVING AGES</p><h3>Age &amp; sex distribution</h3><p>Living people at the selected end day, in years.</p></div><a class="download" data-report="ages" href="#">↓ CSV<span class="sr-only"> · living ages</span></a></div><div id="ages-chart" class="chart" tabindex="0" role="group" aria-label="Living ages by sex. Use arrow keys to inspect."></div><div class="legend"><span><i class="teal"></i>Female</span><span><i class="gold"></i>Male</span></div></article>
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">04 / RECORDED LIFESPANS</p><h3>Age at death</h3><p>Deaths in the selected range, grouped by age in years.</p></div><a class="download" data-report="death_ages" href="#">↓ CSV<span class="sr-only"> · ages at death</span></a></div><div id="death-chart" class="chart" tabindex="0" role="group" aria-label="Ages at death. Use arrow keys to inspect."></div><p class="footnote">Recorded deaths only. Living people have incomplete lifespans; this is not life expectancy.</p></article>
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">05 / FIRST YEAR OF LIFE</p><h3>Infant deaths, in days</h3><p>Deaths before age 365 days inside the selected range.</p></div><a class="download" data-report="infants" href="#">↓ CSV<span class="sr-only"> · infant deaths</span></a></div><div id="infant-chart" class="chart" tabindex="0" role="group" aria-label="Infant deaths by age in days. Use arrow keys to inspect."></div><p class="footnote">Exact ages in days are included in the individual death records below.</p></article>
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">06 / FAMILY LINES</p><h3>Generations</h3><p>Living and deceased people through the selected end day.</p></div><a class="download" data-report="generations" href="#">↓ CSV<span class="sr-only"> · generations</span></a></div><div id="generation-chart" class="chart" tabindex="0" role="group" aria-label="Generation counts. Use arrow keys to inspect."></div><div class="legend"><span><i class="teal"></i>Living</span><span><i class="muted"></i>Deceased</span></div><p class="footnote">Generation is one plus the greater parent generation; founders are 1.</p></article>
+        <article class="panel records"><div class="panel-head"><div><p class="eyebrow">07 / INDIVIDUAL RECORDS</p><h3>Recorded deaths</h3><p>All deaths inside the selected range.</p></div><a class="download" data-report="deaths" href="#">↓ CSV<span class="sr-only"> · individual deaths</span></a></div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Day</th><th>Age at death</th><th>Cause</th></tr></thead><tbody id="death-rows"></tbody></table></div></article>
+      </div>
+      <section class="panel events"><div class="panel-head"><div><p class="eyebrow">08 / WORLD JOURNAL</p><h3>Recent events</h3><p>The latest 20 events in the selected range.</p></div><a class="download" data-report="people" href="#">↓ People CSV</a></div><div class="table-wrap"><table><thead><tr><th>Day</th><th>Event</th><th>Person</th><th>Details</th></tr></thead><tbody id="event-rows"></tbody></table></div></section>
+      <p class="method">Population history is reconstructed from retained birth and death records, not stored tick snapshots. All views and downloads are read-only. No external chart services are used.</p>
+    </section>
+  </main>
+  <footer><span>FIRST GENERATION</span><span>Two founders. An unfolding history.</span></footer>
+  <noscript><p class="message">Enable JavaScript to view graphs. The command-line CSV exports remain available.</p></noscript>
+</body>
+</html>
