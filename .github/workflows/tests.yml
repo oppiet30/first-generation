@@ -52,6 +52,7 @@ jobs:
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/003_reproduction.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/004_partnerships.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/005_relationship_settings.sql
+          mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/006_mortality.sql
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM world_relationship_settings WHERE allow_parent_child_partnerships=1')" = 0
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE world_id=1')" = 2
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE world_id=1 AND mother_id IS NULL AND father_id IS NULL')" = 2
@@ -68,6 +69,7 @@ jobs:
       - name: Verify multiple generations
         run: |
           php bin/simulate.php 1 9000
+          php bin/population-report.php 1
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation -e "SELECT 'partnerships' metric,COUNT(*) total FROM partnerships UNION ALL SELECT 'people',COUNT(*) FROM people UNION ALL SELECT 'children',COUNT(*) FROM people WHERE mother_id IS NOT NULL UNION ALL SELECT 'grandchildren',COUNT(*) FROM people WHERE mother_id IN (SELECT id FROM people WHERE mother_id IS NOT NULL) UNION ALL SELECT 'female_children',COUNT(*) FROM people WHERE sex='female' AND mother_id IS NOT NULL UNION ALL SELECT 'male_children',COUNT(*) FROM people WHERE sex='male' AND mother_id IS NOT NULL"
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM partnerships WHERE world_id=1')" -gt 1
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE mother_id IN (SELECT id FROM people WHERE mother_id IS NOT NULL)')" -gt 0

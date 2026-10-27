@@ -12,6 +12,9 @@ if (!$worldId || $worldId < 1 || !$ticks || $ticks < 1 || $ticks > 10000) {
     exit(2);
 }
 $engine = new WorldEngine(Database::connect());
-for ($i = 0; $i < $ticks; $i++) { $result = $engine->tick($worldId); }
+for ($i = 0; $i < $ticks; $i++) {
+    $result = $engine->tick($worldId);
+    if ($result['extinct']) { break; }
+}
 printf("World %d: day %d (year %d, day %d)\n",
     $worldId, $result['day'], $result['year'], $result['day_of_year']);
