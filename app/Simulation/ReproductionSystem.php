@@ -25,11 +25,13 @@ final class ReproductionSystem
             $event->execute([$worldId,$day,$childId,'birth',$name . ' was born']);
         }
 
-        // Build stable, exclusive adult partnerships. Sibling partnerships are
-        // permitted in this fictional two-founder scenario; parent-child pairs are not.
+        // Build stable, exclusive adult partnerships with configurable kinship rules.
         $peopleQuery = $this->db->prepare('SELECT id,name,sex,birth_day,initial_age_days,mother_id,father_id FROM people WHERE world_id=? AND death_day IS NULL ORDER BY id');
         $peopleQuery->execute([$worldId]);
         $people = $peopleQuery->fetchAll();
+        $settingsQuery = $this->db->prepare('SELECT allow_parent_child_partnerships FROM world_relationship_settings WHERE world_id=?');
+        $settingsQuery->execute([$worldId]);
+        $allowParentChild = (bool)($settingsQuery->fetchColumn() ?: false);
         $byId = [];
         foreach ($people as $person) { $byId[(int)$person['id']] = $person; }
 
@@ -54,8 +56,9 @@ final class ReproductionSystem
                 foreach ($people as $father) {
                     $fid = (int)$father['id'];
                     if ($father['sex'] !== 'male' || isset($paired[$fid]) || !$eligible($father)) { continue; }
-                    if ($mother['mother_id'] == $fid || $mother['father_id'] == $fid ||
-                        $father['mother_id'] == $mid || $father['father_id'] == $mid) { continue; }
+                    if (!$allowParentChild &&
+                        ($mother['mother_id'] == $fid || $mother['father_id'] == $fid ||
+                         $father['mother_id'] == $mid || $father['father_id'] == $mid)) { continue; }
                     $add->execute([$worldId,$mid,$fid,$day]);
                     $paired[$mid] = $paired[$fid] = true;
                     $pairs[] = ['mother_id'=>$mid,'father_id'=>$fid];
