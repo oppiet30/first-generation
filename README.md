@@ -112,13 +112,13 @@ No new migration or per-tick storage is required.
 After migrations 001–006 and Composer installation, serve only the `public/` directory:
 
 ```sh
-php -S 127.0.0.1:8080 -t public
+php -S 127.0.0.1:8080 -t public public/router.php
 ```
 
 Open `http://127.0.0.1:8080/` on that machine. For Dell's trusted LAN, bind to its LAN address instead:
 
 ```sh
-php -S 10.1.10.138:8080 -t public
+php -S 10.1.10.138:8080 -t public public/router.php
 ```
 
 Then open `http://10.1.10.138:8080/` from the LAN. The built-in PHP server is suitable for this local inspection; an always-running deployment should use a configured PHP web server. This page has no login and is intended for a trusted local network, not public internet exposure. Always keep the document root at `public/` so `.env`, source and database files are not served. No firewall or system-service changes are included.

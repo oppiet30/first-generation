@@ -72,7 +72,7 @@ try {
     $socket=stream_socket_server('tcp://127.0.0.1:0',$errno,$error);
     demand($socket !== false,'Reserve a local test port');
     $address=stream_socket_get_name($socket,false); fclose($socket);
-    $server=proc_open([PHP_BINARY,'-S',$address,'-t',dirname(__DIR__).'/public'],
+    $server=proc_open([PHP_BINARY,'-S',$address,'-t',dirname(__DIR__).'/public',dirname(__DIR__).'/public/router.php'],
         [0=>['pipe','r'],1=>['file',$log,'a'],2=>['file',$log,'a']],$serverPipes);
     demand(is_resource($server),'Start dashboard HTTP test server'); fclose($serverPipes[0]);
     $ready=false;
@@ -102,7 +102,7 @@ try {
     $db->prepare('DELETE FROM worlds WHERE id=?')->execute([$empty]);
     [$code]=$get('api.php?world='.$empty); demand($code === 404,'Missing HTTP world');
     foreach(['.env','vendor/autoload.php','database/migrations/001_initial.sql'] as $path) {
-        [$code]=$get($path); demand($code === 404,'Private files outside public document root');
+        [$code]=$get($path); demand($code === 404,'Private files outside public document root: '.$path);
     }
     [$code,$body]=$get(''); demand($code === 200 && str_contains($body,'Population through time'),'Dashboard page serves');
     demand($before === $snapshot(),'Dashboard and downloads leave simulation records unchanged');
