@@ -1,0 +1,58 @@
+name: Foundation tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: test-root-password
+          MARIADB_DATABASE: first_generation
+          MARIADB_USER: fg_app
+          MARIADB_PASSWORD: test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: first_generation
+      DB_USER: fg_app
+      DB_PASSWORD: test-password
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install PHP and MariaDB client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y php-cli php-mysql mariadb-client composer
+      - name: PHP syntax
+        run: find app bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Composer and deterministic tests
+        run: |
+          composer install --no-interaction --no-progress
+          composer test
+      - name: Migrate and create two founders
+        run: |
+          mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/001_initial.sql
+          php bin/create-world.php "Genesis World" 1337
+          test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE world_id=1')" = 2
+          test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE world_id=1 AND mother_id IS NULL AND father_id IS NULL')" = 2
+          test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM world_events WHERE event_type="founder"')" = 2
+      - name: Advance 1,000 days
+        run: |
+          mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation -e "UPDATE worlds SET status='running' WHERE id=1"
+          php bin/simulate.php 1 1000
+          test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT current_day FROM worlds WHERE id=1')" = 1000
+          test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE world_id=1')" = 2

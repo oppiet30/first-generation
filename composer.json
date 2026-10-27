@@ -1,0 +1,19 @@
+{
+  "name": "oppiet30/first-generation",
+  "description": "Deterministic two-founder civilization simulation",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": "^8.3",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "FirstGeneration\\": "app/"
+    }
+  },
+  "scripts": {
+    "test": "php tests/SimulationTest.php"
+  }
+}
