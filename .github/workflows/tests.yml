@@ -39,6 +39,8 @@ jobs:
           sudo apt-get install -y php-cli php-mysql mariadb-client composer
       - name: PHP syntax
         run: find app bin public tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Dashboard JavaScript syntax
+        run: node --check public/assets/dashboard.js
       - name: Composer and deterministic tests
         run: |
           composer install --no-interaction --no-progress

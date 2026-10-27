@@ -31,7 +31,7 @@
         svg.append(svgElement('line', {x1: left, x2: width - right, y1: y(value), y2: y(value), stroke: '#e4e6dc', 'stroke-width': 1}));
         svg.append(svgElement('text', {x: left - 8, y: y(value) + 3, 'text-anchor': 'end', fill: '#67736c', 'font-size': 10}, number(value)));
       }
-      const labelCount = Math.max(2, Math.floor(plotWidth / 65));
+      const labelCount = Math.max(2, Math.floor(plotWidth / (kind === 'line' ? 65 : 38)));
       const every = Math.max(1, Math.ceil(rows.length / labelCount));
       rows.forEach((row, index) => {
         if (index % every === 0 || index === rows.length - 1) {
@@ -107,7 +107,7 @@
     for (const key of ['living', 'births', 'deaths', 'generations']) $(key).textContent = number(data.summary[key]);
     $('to').value = data.to;
     $('range-caption').textContent = `Days ${number(data.from)}–${number(data.to)}, inclusive`;
-    $('interval-summary').textContent = `${number(data.summary.range_births)} births · ${number(data.summary.range_deaths)} deaths in range`;
+    $('interval-summary').textContent = `${number(data.summary.range_births)} ${data.summary.range_births === 1 ? 'birth' : 'births'} · ${number(data.summary.range_deaths)} ${data.summary.range_deaths === 1 ? 'death' : 'deaths'} in range`;
     chart('population-chart', data.daily, ['living'], ['Living'], [colors.teal], row => number(row.day), 'line');
     chart('yearly-chart', data.yearly, ['births', 'deaths'], ['Births', 'Deaths'], [colors.teal, colors.rust], row => `${row.year}`);
     chart('ages-chart', data.ages, ['female', 'male'], ['Female', 'Male'], [colors.teal, colors.gold], row => row.band);
@@ -131,6 +131,7 @@
     $('apply').disabled = true; $('message').textContent = 'Loading statistics…'; $('message').className = 'message';
     // Hide the previous world/range rather than showing stale graphs beside changed filters.
     $('results').hidden = true;
+    loaded = null;
     try {
       const response = await fetch(`api.php?${params}`, {signal: pending.signal, cache: 'no-store'});
       const data = await response.json();
@@ -143,6 +144,10 @@
       if (error.name !== 'AbortError' && id === requestNumber) {
         $('message').textContent = error.message === 'Failed to fetch' ? 'Cannot reach the statistics server. Check the connection and try again.' : error.message;
         $('message').className = 'message error';
+        $('world-name').textContent = `World ${$('world').value}`;
+        $('world-clock').textContent = 'Unavailable';
+        $('world-status').textContent = 'No statistics loaded';
+        $('range-caption').textContent = 'No range loaded';
       }
     } finally { if (id === requestNumber) $('apply').disabled = false; }
   }
