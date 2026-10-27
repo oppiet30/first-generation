@@ -24,6 +24,7 @@ final class WorldEngine
             $day = (int)$world['current_day'] + 1;
             // Preserve RNG state for future deterministic simulation systems.
             $rng = new DeterministicRandom((int)$world['rng_state']);
+            (new ReproductionSystem($this->db))->advance($worldId, $day, $rng);
             $q = $this->db->prepare('UPDATE worlds SET current_day=?, rng_state=? WHERE id=?');
             $q->execute([$day, $rng->state(), $worldId]);
             $this->db->commit();
