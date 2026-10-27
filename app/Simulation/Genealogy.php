@@ -11,7 +11,7 @@ final class Genealogy
 
     public function people(int $worldId): array
     {
-        $q = $this->db->prepare('SELECT p.id,p.name,p.sex,p.birth_day,p.initial_age_days,p.death_day,p.mother_id,p.father_id,w.current_day FROM people p JOIN worlds w ON w.id=p.world_id WHERE p.world_id=? ORDER BY p.id');
+        $q = $this->db->prepare('SELECT p.id,p.name,p.sex,p.birth_day,p.initial_age_days,p.death_day,d.cause AS death_cause,p.mother_id,p.father_id,w.current_day FROM people p JOIN worlds w ON w.id=p.world_id LEFT JOIN deaths d ON d.person_id=p.id AND d.world_id=p.world_id WHERE p.world_id=? ORDER BY p.id');
         $q->execute([$worldId]);
         $people = $q->fetchAll(PDO::FETCH_ASSOC);
         foreach ($people as &$person) {

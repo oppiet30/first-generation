@@ -6,7 +6,7 @@ At day 1, the founders form a partnership. Every 30 days, unpartnered adults are
 
 A 1% daily conception check applies to eligible couples who are not already pregnant and have not conceived in the last 365 days. Gestation remains 280 days. No immigrants or additional founders are introduced.
 
-**Limitations:** This is a simplified simulation rule, not a historical or biological claim. There is no relationship dissolution, infertility, miscarriage, mortality, or genetic inheritance yet. The deterministic pairing policy may leave some adults unpaired.
+**Limitations:** This is a simplified simulation rule, not a historical or biological claim. Death closes active partnerships. There is no voluntary relationship dissolution, infertility, miscarriage, or genetic inheritance yet. The deterministic pairing policy may leave some adults unpaired.
 
 ## Optional relationship setting
 
