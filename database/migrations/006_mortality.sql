@@ -1,0 +1,11 @@
+CREATE TABLE deaths (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ world_id BIGINT UNSIGNED NOT NULL,
+ person_id BIGINT UNSIGNED NOT NULL,
+ day BIGINT UNSIGNED NOT NULL,
+ cause VARCHAR(32) NOT NULL,
+ UNIQUE KEY uq_deaths_person (person_id),
+ KEY idx_deaths_world_day (world_id,day),
+ FOREIGN KEY (world_id) REFERENCES worlds(id) ON DELETE CASCADE,
+ FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

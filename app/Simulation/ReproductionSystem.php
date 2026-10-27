@@ -16,7 +16,18 @@ final class ReproductionSystem
         $birth = $this->db->prepare('INSERT INTO people(world_id,name,sex,birth_day,mother_id,father_id) VALUES (?,?,?,?,?,?)');
         $finish = $this->db->prepare('UPDATE pregnancies SET delivered_day=?,child_id=? WHERE id=? AND delivered_day IS NULL');
         $event = $this->db->prepare('INSERT INTO world_events(world_id,day,person_id,event_type,details) VALUES (?,?,?,?,?)');
+        $motherAlive = $this->db->prepare('SELECT COUNT(*) FROM people WHERE world_id=? AND id=? AND death_day IS NULL');
+        $mortality = new MortalitySystem($this->db);
         foreach ($q->fetchAll() as $pregnancy) {
+            $motherAlive->execute([$worldId,$pregnancy['mother_id']]);
+            if ((int)$motherAlive->fetchColumn() === 0) {
+                $finish->execute([$day,null,$pregnancy['id']]);
+                continue;
+            }
+            // Illustrative 0.2% maternal death risk at delivery.
+            if ($rng->nextInt(1000) < 2) {
+                $mortality->kill($worldId,(int)$pregnancy['mother_id'],$day,'childbirth');
+            }
             $sex = $rng->nextInt(2) === 0 ? 'female' : 'male';
             $name = 'Child-' . $worldId . '-' . $pregnancy['id'];
             $birth->execute([$worldId,$name,$sex,$day,$pregnancy['mother_id'],$pregnancy['father_id']]);
