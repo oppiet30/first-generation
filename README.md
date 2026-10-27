@@ -8,7 +8,7 @@ A standalone, deterministic PHP/MariaDB simulation beginning with exactly two hu
 - Aging, parent references and ancestor traversal.
 - Adult partnerships, pregnancies, births and descendant families.
 - Age-based and childbirth mortality, death records, partnership closure on death and extinction detection.
-- Family-tree and population reports. Mortality rates are illustrative, not historical estimates.
+- Family-tree, population and event-history reports. Mortality rates are illustrative, not historical estimates.
 
 Genetics, terrain, wildlife, resource-based survival and a browser UI remain unimplemented. See [genealogy](docs/aging-genealogy.md), [reproduction](docs/reproduction.md), [relationships](docs/descendant-families.md) and [mortality](docs/mortality.md).
 
@@ -61,6 +61,22 @@ For the reported 10,000-day world, 22 births plus two founders gives 24 people: 
 
 Time advances only when the CLI runs, with 1–10,000 days per invocation; extinction stops the run. There is no background scheduler.
 
+## Simulation history
+
+Read existing events without advancing time or changing the world:
+
+```sh
+php bin/world-history.php 1
+php bin/world-history.php 1 --type=death
+php bin/world-history.php 1 --from=9000 --to=10000
+php bin/world-history.php 1 --type=birth --from=9000 --to=10000
+php bin/world-history.php --help
+```
+
+Supported types are `founder`, `partnership`, `conception`, `birth`, `death` and `extinction`. Omit `--type` to show all types. Day bounds are inclusive, allow day zero, and can be used independently. Events appear in day order, with event ID breaking same-day ties. Each row shows the day, type, person name and ID (or `-` for events without a person), and recorded details, including death causes. Empty results print `No matching events.`
+
+Invalid arguments exit with code 2; a missing world exits with code 1. Success, including an empty result, exits with code 0. This report uses the existing `world_events` table and needs no new migration.
+
 ## Tests
 
 ```sh
@@ -73,6 +89,8 @@ php tests/FamilyTreeIntegrationTest.php
 php tests/MortalityPartnershipIntegrationTest.php
 # With migrations 001–006 applied; creates and removes an isolated CLI world:
 php tests/CreateWorldIntegrationTest.php
+# With migrations 001–006 applied; creates and removes isolated history fixtures:
+php tests/WorldHistoryIntegrationTest.php
 ```
 
 GitHub Actions runs PHP syntax checks, deterministic tests, mortality and family-tree regressions, and a 10,000-day multi-generation integration scenario on MariaDB. It runs on pull requests, pushes to main or feature/mortality-survival, and manual dispatch. Require green checks for the latest commit before considering a merge.
