@@ -16,7 +16,7 @@ try {
     $q = $db->prepare("INSERT INTO worlds(name,seed,rng_state,status) VALUES (?,?,?,'paused')");
     $q->execute([$name, $seed, $seed]);
     $worldId = (int)$db->lastInsertId();
-    $person = $db->prepare('INSERT INTO people(world_id,name,sex,birth_day) VALUES (?,?,?,0)');
+    $person = $db->prepare('INSERT INTO people(world_id,name,sex,birth_day,initial_age_days) VALUES (?,?,?,0,7300)');
     $event = $db->prepare('INSERT INTO world_events(world_id,day,person_id,event_type,details) VALUES (?,0,?,?,?)');
     foreach ([['Adam','male'],['Eve','female']] as [$personName, $sex]) {
         $person->execute([$worldId, $personName, $sex]);
