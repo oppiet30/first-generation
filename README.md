@@ -70,6 +70,8 @@ composer test
 php tests/MortalityIntegrationTest.php
 # With migrations 001–006 applied; creates and cleans up its own isolated world:
 php tests/FamilyTreeIntegrationTest.php
+# With migrations 001–006 applied; all fixture changes roll back:
+php tests/MortalityPartnershipIntegrationTest.php
 ```
 
 GitHub Actions runs PHP syntax checks, deterministic tests, mortality and family-tree regressions, and a 10,000-day multi-generation integration scenario on MariaDB. It runs on pull requests, pushes to main or feature/mortality-survival, and manual dispatch. Require green checks for the latest commit before considering a merge.

@@ -55,6 +55,7 @@ jobs:
           php bin/family-tree.php 1
           php tests/FamilyTreeIntegrationTest.php
           php tests/MortalityIntegrationTest.php
+          php tests/MortalityPartnershipIntegrationTest.php
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM world_relationship_settings WHERE allow_parent_child_partnerships=1')" = 0
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE world_id=1')" = 2
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM people WHERE world_id=1 AND mother_id IS NULL AND father_id IS NULL')" = 2
