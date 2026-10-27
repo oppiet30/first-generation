@@ -46,12 +46,13 @@ jobs:
       - name: Migrate and create two founders
         run: |
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/001_initial.sql
-          php bin/create-world.php "Genesis World" 1337
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/002_aging_genealogy.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/003_reproduction.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/004_partnerships.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/005_relationship_settings.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/006_mortality.sql
+          php bin/create-world.php "Genesis World" 1337
+          php tests/CreateWorldIntegrationTest.php
           php bin/family-tree.php 1
           php tests/FamilyTreeIntegrationTest.php
           php tests/MortalityIntegrationTest.php

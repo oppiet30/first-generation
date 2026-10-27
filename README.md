@@ -28,18 +28,17 @@ Keep real credentials out of Git. For example, `DB_PASSWORD=example#value=123` s
 
 ## Fresh installation
 
-The current founder-creation script relies on migration 002 to assign the founders their initial age of 20 years. For the initial world, use this order:
+Apply all migrations before creating a world. Every new world starts with two living, 20-year-old founders:
 
 ```sh
 composer install
-mariadb -u YOUR_USER -p first_generation < database/migrations/001_initial.sql
-php bin/create-world.php "Genesis World" 1337
-for migration in database/migrations/00[2-6]_*.sql; do
+for migration in database/migrations/00[1-6]_*.sql; do
     mariadb -u YOUR_USER -p first_generation < "$migration"
 done
+php bin/create-world.php "Genesis World" 1337
 ```
 
-For an existing installation, apply only unapplied migrations in numeric order through 006; do not reapply migrations or recreate your existing world. Back up your database before upgrading. After 002 has run, additional worlds currently need their founder `initial_age_days` set to 7300 explicitly; the creation script still inserts zero-age founders on an already migrated schema.
+For an existing installation, apply only unapplied migrations in numeric order through 006; do not reapply migrations or recreate your existing world. Back up your database before upgrading. This code update needs no new migration and does not rewrite existing worlds.
 
 ## Run and inspect
 
@@ -72,6 +71,8 @@ php tests/MortalityIntegrationTest.php
 php tests/FamilyTreeIntegrationTest.php
 # With migrations 001–006 applied; all fixture changes roll back:
 php tests/MortalityPartnershipIntegrationTest.php
+# With migrations 001–006 applied; creates and removes an isolated CLI world:
+php tests/CreateWorldIntegrationTest.php
 ```
 
 GitHub Actions runs PHP syntax checks, deterministic tests, mortality and family-tree regressions, and a 10,000-day multi-generation integration scenario on MariaDB. It runs on pull requests, pushes to main or feature/mortality-survival, and manual dispatch. Require green checks for the latest commit before considering a merge.
