@@ -36,37 +36,53 @@ final class ReproductionSystem
             $event->execute([$worldId,$day,$childId,'birth',$name . ' was born']);
         }
 
-        // Build stable, exclusive adult partnerships with configurable kinship rules.
-        $peopleQuery = $this->db->prepare('SELECT id,name,sex,birth_day,initial_age_days,mother_id,father_id FROM people WHERE world_id=? AND death_day IS NULL ORDER BY id');
-        $peopleQuery->execute([$worldId]);
-        $people = $peopleQuery->fetchAll();
+        // Only fetch adults eligible to reproduce; avoid hydrating every living person.
+        $peopleQuery = $this->db->prepare(
+            "SELECT id,sex,mother_id,father_id FROM people
+             WHERE world_id=? AND death_day IS NULL
+               AND (? - birth_day + initial_age_days) >= 18*365
+               AND (? - birth_day + initial_age_days) <=
+                   CASE WHEN sex='female' THEN 45*365 ELSE 65*365 END
+             ORDER BY id"
+        );
+        $peopleQuery->execute([$worldId,$day,$day]);
+        $women = [];
+        $men = [];
+        while ($person = $peopleQuery->fetch(PDO::FETCH_ASSOC)) {
+            $person['id'] = (int)$person['id'];
+            if ($person['sex'] === 'female') {
+                $women[] = $person;
+            } elseif ($person['sex'] === 'male') {
+                $men[] = $person;
+            }
+        }
         $settingsQuery = $this->db->prepare('SELECT allow_parent_child_partnerships FROM world_relationship_settings WHERE world_id=?');
         $settingsQuery->execute([$worldId]);
         $allowParentChild = (bool)($settingsQuery->fetchColumn() ?: false);
-        $byId = [];
-        foreach ($people as $person) { $byId[(int)$person['id']] = $person; }
 
         $pairQuery = $this->db->prepare('SELECT mother_id,father_id FROM partnerships WHERE world_id=? AND ended_day IS NULL ORDER BY id');
         $pairQuery->execute([$worldId]);
-        $pairs = $pairQuery->fetchAll();
+        $pairs = $pairQuery->fetchAll(PDO::FETCH_ASSOC);
         $paired = [];
         foreach ($pairs as $pair) {
             $paired[(int)$pair['mother_id']] = true;
             $paired[(int)$pair['father_id']] = true;
         }
-        $age = static fn(array $p): int => $day - (int)$p['birth_day'] + (int)$p['initial_age_days'];
-        $eligible = static fn(array $p): bool => $age($p) >= 18*365
-            && ($p['sex'] === 'female' ? $age($p) <= 45*365 : $age($p) <= 65*365);
-        // Adam and Eve form the original partnership on the first tick.
-        // Later partnerships form at 30-day intervals to keep simulation cost bounded.
+
+        // Match in ascending ID order, as before, but skip already-paired men
+        // using a moving cursor rather than rescanning the entire population.
         if ($day === 1 || $day % 30 === 0) {
             $add = $this->db->prepare('INSERT INTO partnerships(world_id,mother_id,father_id,started_day) VALUES (?,?,?,?)');
-            foreach ($people as $mother) {
-                $mid = (int)$mother['id'];
-                if ($mother['sex'] !== 'female' || isset($paired[$mid]) || !$eligible($mother)) { continue; }
-                foreach ($people as $father) {
-                    $fid = (int)$father['id'];
-                    if ($father['sex'] !== 'male' || isset($paired[$fid]) || !$eligible($father)) { continue; }
+            $cursor = 0;
+            $menCount = count($men);
+            foreach ($women as $mother) {
+                $mid = $mother['id'];
+                if (isset($paired[$mid])) { continue; }
+                while ($cursor < $menCount && isset($paired[$men[$cursor]['id']])) { ++$cursor; }
+                for ($j = $cursor; $j < $menCount; ++$j) {
+                    $father = $men[$j];
+                    $fid = $father['id'];
+                    if (isset($paired[$fid])) { continue; }
                     if (!$allowParentChild &&
                         ($mother['mother_id'] == $fid || $mother['father_id'] == $fid ||
                          $father['mother_id'] == $mid || $father['father_id'] == $mid)) { continue; }
@@ -79,13 +95,22 @@ final class ReproductionSystem
             }
         }
 
+        // Check eligibility for existing couples in one query, not by keeping
+        // the entire living population in PHP memory.
+        $eligiblePair = $this->db->prepare(
+            "SELECT COUNT(*) FROM people WHERE world_id=? AND id IN (?,?)
+             AND death_day IS NULL
+             AND (? - birth_day + initial_age_days) >= 18*365
+             AND (? - birth_day + initial_age_days) <=
+                 CASE WHEN sex='female' THEN 45*365 ELSE 65*365 END"
+        );
         $active = $this->db->prepare('SELECT COUNT(*) FROM pregnancies WHERE world_id=? AND mother_id=? AND delivered_day IS NULL');
         $latest = $this->db->prepare('SELECT MAX(conceived_day) FROM pregnancies WHERE world_id=? AND mother_id=?');
         $conceive = $this->db->prepare('INSERT INTO pregnancies(world_id,mother_id,father_id,conceived_day,due_day) VALUES (?,?,?,?,?)');
         foreach ($pairs as $pair) {
             $mid = (int)$pair['mother_id']; $fid = (int)$pair['father_id'];
-            if (!isset($byId[$mid],$byId[$fid]) ||
-                !$eligible($byId[$mid]) || !$eligible($byId[$fid])) { continue; }
+            $eligiblePair->execute([$worldId,$mid,$fid,$day,$day]);
+            if ((int)$eligiblePair->fetchColumn() !== 2) { continue; }
             $active->execute([$worldId,$mid]);
             if ((int)$active->fetchColumn() > 0) { continue; }
             $latest->execute([$worldId,$mid]);
