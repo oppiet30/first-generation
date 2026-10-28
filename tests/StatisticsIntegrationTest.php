@@ -48,6 +48,15 @@ try {
     demand(count($early['people']) === 3 && $early['people'][0]['death_day'] === null && $early['people'][0]['age_days'] === 7301,'Historical people age as of selected day');
     demand($early['summary']['generations'] === 2 && $early['deaths'] === [] && $early['events'] === [],'Future ancestry and events do not leak');
     $slice = $stats->report($world,2,3);
+    $dashboard = $stats->report($world,2,3,true);
+    foreach (['summary','daily','yearly','ages','death_ages','infants','generations','deaths','events'] as $key) {
+        demand($dashboard[$key] === $slice[$key],'Dashboard matches full report: '.$key);
+    }
+    demand($dashboard['people'] === [],'Dashboard excludes unused people export');
+    $streamed = $stats->report($world,2,3,false,true);
+    foreach (['daily','people','deaths'] as $key) {
+        demand(iterator_to_array($streamed[$key],false) === $slice[$key],'Streamed export matches full report: '.$key);
+    }
     demand($slice['daily'] === array_slice($full['daily'],2,2),'Range does not reset cumulative counts');
     demand(array_sum(array_column($slice['yearly'],'births')) === 2 && array_sum(array_column($slice['yearly'],'deaths')) === 3,'Yearly graphs respect selected interval');
     demand($slice['deaths'][1]['age_days'] === 2 && $slice['deaths'][1]['cause'] === 'unknown','Exact infant and legacy cause records');

@@ -43,6 +43,10 @@ jobs:
         run: node --check public/assets/dashboard.js
       - name: Dashboard response handling
         run: node --test tests/DashboardTest.cjs
+      - name: Large dashboard memory regression
+        run: |
+          php -d memory_limit=128M tests/StatisticsMemoryTest.php
+          php -d memory_limit=128M tests/StatisticsMemoryTest.php --stream
       - name: Composer and deterministic tests
         run: |
           composer install --no-interaction --no-progress

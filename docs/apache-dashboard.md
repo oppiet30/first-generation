@@ -75,6 +75,26 @@ services blindly. Do not disable SELinux or make the socket world-writable.
 Repeat the API check above and confirm it returns JSON, then reload the dashboard.
 The browser error-handling change does not restore an unavailable PHP service.
 
+## Large populations and PHP memory
+
+Statistics read population rows with an unbuffered PDO cursor into a private
+temporary file. Compact parent IDs support genealogy calculations without keeping
+every person's full database row in memory. The operating system's temporary
+directory must have enough free disk space; PHP removes the temporary files when
+they close or the request ends. Failure to create or write a spool returns the
+normal logged API error instead of an incomplete report.
+
+The dashboard sends at most 2,000 daily observations and 200 individual death
+records, and omits the unused per-person export. The page labels sampled graphs
+and truncated tables. Summary counts, yearly counts, age distributions and
+generation totals still include all applicable records. Both range endpoints
+are shown. CSV downloads keep every day, person and death, using disk-backed
+iterables rather than collecting all export rows in PHP arrays.
+
+Regression tests cover 420,000 people and 100,000 days under a 128 MiB PHP limit.
+Memory still grows with the compact ancestry index and the number of distinct
+event days; this is a reduction in memory use, not unlimited population capacity.
+
 ## Rollback
 
 Disable only the newly installed First Generation virtual-host configuration, validate Apache's configuration, and gracefully reload. Leave the other virtual hosts and the simulation database alone. The dedicated application checkout can remain for later inspection; no database rollback is necessary.

@@ -35,7 +35,7 @@ if (!is_string($format) || !in_array($format,['json','csv'],true) || !is_string(
     fail(400,'Unknown report or format.');
 }
 try {
-    $report = (new PopulationStatistics(Database::connect()))->report($values['world'] ?? 1,$values['from'] ?? 0,$values['to'] ?? null);
+    $report = (new PopulationStatistics(Database::connect()))->report($values['world'] ?? 1,$values['from'] ?? 0,$values['to'] ?? null,$format === 'json',$format === 'csv');
 } catch (InvalidArgumentException $error) {
     fail(400,$error->getMessage());
 } catch (RuntimeException $error) {
