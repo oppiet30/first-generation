@@ -86,6 +86,11 @@ years have an asterisk. Wider yearly charts scroll horizontally rather than
 squeezing the bars; CSV still includes the entire selected day range. Display
 choices are remembered in that browser when storage is available.
 
+The age-and-sex chart prints exact counts above both bars. The paired labels are
+staggered, and the chart can scroll horizontally to keep long counts readable.
+Hover, tap, or use its arrow keys to see counts plus each sex's percentage within
+that age band. Empty bands show 0 counts and 0.0% rather than an undefined ratio.
+
 The **Auto-refresh** selector offers **Off**, **5 minutes** (the default),
 **10 minutes**, and **15 minutes**. It remembers your choice in that browser
 when local storage is available, and changing it immediately replaces the timer.
