@@ -77,6 +77,15 @@ The browser error-handling change does not restore an unavailable PHP service.
 
 ## Large populations and PHP memory
 
+**Graph colors** switches every graph between blue/orange and black/gray while
+keeping the non-yearly graph layouts unchanged. The births-and-deaths chart has
+its own **Bar width** (Standard/Wide) and **Years shown** (last 10, last 20, or full
+history) controls. It starts with wide bars and the last 20 years. Births use solid
+bars and deaths use diagonal stripes, with matching legend swatches. Partial
+years have an asterisk. Wider yearly charts scroll horizontally rather than
+squeezing the bars; CSV still includes the entire selected day range. Display
+choices are remembered in that browser when storage is available.
+
 The **Auto-refresh** selector offers **Off**, **5 minutes** (the default),
 **10 minutes**, and **15 minutes**. It remembers your choice in that browser
 when local storage is available, and changing it immediately replaces the timer.

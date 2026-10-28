@@ -15,14 +15,27 @@
   let requestNumber = 0;
   let filtersEdited = false;
   const charts = [];
-  function chart(id, rows, keys, labels, palette, label, kind = 'bar') {
+  function chart(id, rows, keys, labels, palette, label, kind = 'bar', patterned = false) {
     const container = $(id);
     let selected = -1;
     function draw() {
+      const highContrast = $('chart-colors').value === 'contrast';
+      const displayColors = highContrast ? ['#202020', '#8a8a8a'] : ['#0072b2', '#e69f00'];
+      const wide = id === 'yearly-chart' && $('yearly-bars').value === 'wide';
+      const deathOnly = id === 'death-chart' || id === 'infant-chart';
+      palette = deathOnly ? [displayColors[1]] : displayColors;
+      if (id === 'yearly-chart') container.style.minWidth = `${Math.max(260, rows.length * (wide ? 64 : 40))}px`;
       const width = Math.max(container.clientWidth, 260), height = container.clientHeight || 259;
       const left = 39, right = 14, top = 24, bottom = 41;
       const plotWidth = width - left - right, plotHeight = height - top - bottom;
       const svg = svgElement('svg', {viewBox: `0 0 ${width} ${height}`, 'aria-hidden': 'true'});
+      if (patterned) {
+        const defs = svgElement('defs');
+        const pattern = svgElement('pattern', {id: `${id}-deaths`, patternUnits: 'userSpaceOnUse', width: 6, height: 6});
+        pattern.append(svgElement('rect', {width: 6, height: 6, fill: deathOnly ? palette[0] : palette[1]}));
+        pattern.append(svgElement('path', {d: 'M-1,1 L1,-1 M0,6 L6,0 M5,7 L7,5', stroke: '#182e2c', 'stroke-width': 1.5}));
+        defs.append(pattern); svg.append(defs);
+      }
       const maximum = rows.reduce((max, row) => Math.max(max, ...keys.map(key => Number(row[key]))), 0);
       const step = Math.max(1, Math.ceil(maximum / 4)), maxY = step * 4;
       const y = value => top + plotHeight * (1 - value / maxY);
@@ -49,10 +62,11 @@
             if (rows.length === 1) svg.append(svgElement('circle', {cx: x(0), cy: y(Number(rows[0][key])), r: 3, fill: palette[series]}));
           }
         } else {
-          const group = plotWidth / Math.max(1, rows.length), barWidth = Math.max(1, Math.min(28, group * 0.72 / keys.length));
+          const group = plotWidth / Math.max(1, rows.length), barWidth = Math.max(1, Math.min(wide ? 40 : 28, group * (wide ? 0.86 : 0.72) / keys.length));
           rows.forEach((row, index) => {
             const rect = svgElement('rect', {x: x(index) - barWidth * keys.length / 2 + series * barWidth,
-              y: y(Number(row[key])), width: Math.max(1, barWidth - 2), height: y(0) - y(Number(row[key])), fill: palette[series], rx: 1});
+              y: y(Number(row[key])), width: Math.max(1, barWidth - 2), height: y(0) - y(Number(row[key])),
+              fill: patterned && (series === 1 || deathOnly) ? `url(#${id}-deaths)` : palette[series], rx: 1});
             rect.append(svgElement('title', {}, `${label(row)} · ${labels[series]}: ${number(row[key])}`));
             svg.append(rect);
           });
@@ -90,6 +104,38 @@
     draw();
     charts.push({container, draw});
   }
+  function renderYearly() {
+    if (!loaded) return;
+    const rows = $('yearly-window').value === 'all' ? loaded.yearly : loaded.yearly.slice(-Number($('yearly-window').value));
+    const highContrast = $('chart-colors').value === 'contrast';
+    const palette = highContrast ? ['#202020', '#8a8a8a'] : ['#0072b2', '#e69f00'];
+    const partial = row => row.year > 0 && (row.from_day > (row.year-1)*365+1 || row.to_day < row.year*365);
+    const first = rows[0], last = rows.at(-1);
+    $('yearly-caption').textContent = rows.length
+      ? `Years ${first.year}–${last.year}. * marks a partial year. Scroll horizontally for more years. CSV includes the entire selected day range.`
+      : 'No years in the selected day range.';
+    // Replace this chart's resize handler when a display preference changes.
+    const previous = charts.findIndex(item => item.container === $('yearly-chart'));
+    if (previous !== -1) charts.splice(previous, 1);
+    chart('yearly-chart', rows, ['births', 'deaths'], ['Births', 'Deaths'], palette,
+      row => `${row.year}${partial(row) ? '*' : ''}`, 'bar', true);
+  }
+  for (const [id, fallback, values] of [
+    ['yearly-window', '20', ['10', '20', 'all']],
+    ['chart-colors', 'color', ['color', 'contrast']],
+    ['yearly-bars', 'wide', ['standard', 'wide']]
+  ]) {
+    const key = `first-generation-${id}`;
+    let saved;
+    try { saved = localStorage.getItem(key); } catch {}
+    $(id).value = values.includes(saved) ? saved : fallback;
+    $(id).addEventListener('change', () => {
+      if (!values.includes($(id).value)) $(id).value = fallback;
+      try { localStorage.setItem(key, $(id).value); } catch {}
+      if (id === 'yearly-window' || id === 'yearly-bars') renderYearly();
+      else if (loaded) render(loaded);
+    });
+  }
   function table(id, rows, cells, emptyMessage) {
     const body = $(id); body.replaceChildren();
     if (!rows.length) {
@@ -101,6 +147,9 @@
   }
   function render(data) {
     loaded = data; charts.length = 0;
+    const palette = $('chart-colors').value === 'contrast' ? ['#202020', '#8a8a8a'] : ['#0072b2', '#e69f00'];
+    $('results').style.setProperty('--birth-color', palette[0]);
+    $('results').style.setProperty('--death-color', palette[1]);
     $('results').hidden = false;
     $('world-name').textContent = data.world.name;
     $('world-clock').textContent = `Day ${number(data.world.current_day)}`;
@@ -114,7 +163,7 @@
       ? `Showing ${number(data.display.death_rows)} of ${number(data.display.death_rows_total)} deaths in person ID order. Download CSV for all records.`
       : 'All deaths inside the selected range.';
     chart('population-chart', data.daily, ['living'], ['Living'], [colors.teal], row => number(row.day), 'line');
-    chart('yearly-chart', data.yearly, ['births', 'deaths'], ['Births', 'Deaths'], [colors.teal, colors.rust], row => `${row.year}`);
+    renderYearly();
     chart('ages-chart', data.ages, ['female', 'male'], ['Female', 'Male'], [colors.teal, colors.gold], row => row.band);
     chart('death-chart', data.death_ages, ['count'], ['Deaths'], [colors.rust], row => row.band);
     chart('infant-chart', data.infants, ['count'], ['Deaths'], [colors.rust], row => row.band);
