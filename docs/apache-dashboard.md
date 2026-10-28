@@ -77,6 +77,12 @@ The browser error-handling change does not restore an unavailable PHP service.
 
 ## Large populations and PHP memory
 
+The open dashboard refreshes statistics every five minutes while the page is
+visible. Leave **To day** blank to follow the latest saved simulation day, or
+enter an end day to keep a historical range. Automatic refresh waits for current
+requests and pauses while filters have unapplied edits. Full history returns to
+day zero with no fixed end day.
+
 Statistics read population rows with an unbuffered PDO cursor into a private
 temporary file. Compact parent IDs support genealogy calculations without keeping
 every person's full database row in memory. The operating system's temporary

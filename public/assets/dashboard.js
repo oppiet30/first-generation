@@ -13,6 +13,7 @@
   let loaded = null;
   let pending = null;
   let requestNumber = 0;
+  let filtersEdited = false;
   const charts = [];
   function chart(id, rows, keys, labels, palette, label, kind = 'bar') {
     const container = $(id);
@@ -105,7 +106,7 @@
     $('world-clock').textContent = `Day ${number(data.world.current_day)}`;
     $('world-status').textContent = `World ${data.world.id} · ${data.world.status} · view ends day ${number(data.to)}`;
     for (const key of ['living', 'births', 'deaths', 'generations']) $(key).textContent = number(data.summary[key]);
-    $('to').value = data.to;
+    // A blank end day follows the simulation as it advances.
     $('range-caption').textContent = `Days ${number(data.from)}–${number(data.to)}, inclusive`;
     $('interval-summary').textContent = `${number(data.summary.range_births)} ${data.summary.range_births === 1 ? 'birth' : 'births'} · ${number(data.summary.range_deaths)} ${data.summary.range_deaths === 1 ? 'death' : 'deaths'} in range`;
     if (data.display?.daily_step > 1) $('interval-summary').textContent += ` · graph sampled every ${number(data.display.daily_step)} days`;
@@ -151,9 +152,11 @@
       }
       if (!response.ok) throw new Error(data.error || 'Statistics could not be loaded.');
       if (id !== requestNumber) return;
-      if (reset) $('from').value = 0;
+      if (reset) { $('from').value = 0; $('to').value = ''; }
       render(data); $('message').textContent = '';
-      history.replaceState(null, '', `?${new URLSearchParams({world: data.world.id, from: data.from, to: data.to})}`);
+      const urlParams = new URLSearchParams({world: data.world.id, from: data.from});
+      if (params.has('to')) urlParams.set('to', data.to);
+      history.replaceState(null, '', `?${urlParams}`);
     } catch (error) {
       if (error.name !== 'AbortError' && id === requestNumber) {
         $('message').textContent = error.message === 'Failed to fetch' ? 'Cannot reach the statistics server. Check the connection and try again.' : error.message;
@@ -163,13 +166,18 @@
         $('world-status').textContent = 'No statistics loaded';
         $('range-caption').textContent = 'No range loaded';
       }
-    } finally { if (id === requestNumber) $('apply').disabled = false; }
+    } finally { if (id === requestNumber) { $('apply').disabled = false; pending = null; } }
   }
-  $('filters').addEventListener('submit', event => { event.preventDefault(); load(); });
-  $('reset').addEventListener('click', () => load(true));
+  $('filters').addEventListener('input', () => { filtersEdited = true; });
+  $('filters').addEventListener('submit', event => { event.preventDefault(); filtersEdited = false; load(); });
+  $('reset').addEventListener('click', () => { filtersEdited = false; load(true); });
   const initial = new URLSearchParams(location.search);
   for (const key of ['world', 'from', 'to']) if (initial.has(key)) $(key).value = initial.get(key);
   let resizeTimer;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (loaded) for (const item of charts) item.draw(); }, 120); });
   load();
+  setInterval(() => {
+    // Do not interrupt a request or apply filters the viewer is still editing.
+    if (!document.hidden && !pending && !filtersEdited) load();
+  }, 5 * 60 * 1000);
 })();
