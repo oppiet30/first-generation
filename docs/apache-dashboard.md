@@ -50,6 +50,31 @@ Resolve `first-generation.local` to `10.1.10.138` using local DNS or that device
 
 Then visit `http://first-generation.local/`. Using the raw IP will select Dell's existing default virtual host, not this named site. This configuration does not add HTTPS, modify certificates, change firewall rules or expose a new port. It provides a trusted-LAN, unauthenticated statistics page; do not publish it on the public internet.
 
+## Page loads but statistics return HTTP 503
+
+If the dashboard loads but reports HTTP 503, inspect `/api.php?world=1`
+directly. An HTML **Service Unavailable** response is an Apache/backend failure,
+not a JSON statistics report. A running Apache can still serve static HTML while
+PHP-FPM is stopped, restarting, overloaded, or inaccessible through its socket.
+
+On Dell, inspect the services and logs before changing configuration:
+
+```sh
+systemctl status httpd php-fpm --no-pager
+sudo journalctl -u php-fpm -u httpd --since '1 hour ago' --no-pager
+sudo tail -n 80 /var/log/httpd/first-generation_error.log
+sudo ls -l /run/php-fpm/www.sock
+```
+
+Compare socket errors with the handler in `/etc/httpd/conf.d/php.conf` and
+PHP-FPM's configured listen address. If PHP-FPM is stopped, resolve the logged
+cause before starting it with `sudo systemctl start php-fpm`. If it is running,
+investigate the logged capacity or connection error rather than restarting
+services blindly. Do not disable SELinux or make the socket world-writable.
+
+Repeat the API check above and confirm it returns JSON, then reload the dashboard.
+The browser error-handling change does not restore an unavailable PHP service.
+
 ## Rollback
 
 Disable only the newly installed First Generation virtual-host configuration, validate Apache's configuration, and gracefully reload. Leave the other virtual hosts and the simulation database alone. The dedicated application checkout can remain for later inspection; no database rollback is necessary.
