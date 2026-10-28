@@ -77,8 +77,11 @@ The browser error-handling change does not restore an unavailable PHP service.
 
 ## Large populations and PHP memory
 
-The open dashboard refreshes statistics every five minutes while the page is
-visible. Leave **To day** blank to follow the latest saved simulation day, or
+The **Auto-refresh** selector offers **Off**, **5 minutes** (the default),
+**10 minutes**, and **15 minutes**. It remembers your choice in that browser
+when local storage is available, and changing it immediately replaces the timer.
+The open dashboard refreshes statistics at the selected interval while the page
+is visible. Leave **To day** blank to follow the latest saved simulation day, or
 enter an end day to keep a historical range. Automatic refresh waits for current
 requests and pauses while filters have unapplied edits. Full history returns to
 day zero with no fixed end day.
