@@ -108,6 +108,10 @@
     $('to').value = data.to;
     $('range-caption').textContent = `Days ${number(data.from)}–${number(data.to)}, inclusive`;
     $('interval-summary').textContent = `${number(data.summary.range_births)} ${data.summary.range_births === 1 ? 'birth' : 'births'} · ${number(data.summary.range_deaths)} ${data.summary.range_deaths === 1 ? 'death' : 'deaths'} in range`;
+    if (data.display?.daily_step > 1) $('interval-summary').textContent += ` · graph sampled every ${number(data.display.daily_step)} days`;
+    $('death-caption').textContent = data.display && data.display.death_rows < data.display.death_rows_total
+      ? `Showing ${number(data.display.death_rows)} of ${number(data.display.death_rows_total)} deaths in person ID order. Download CSV for all records.`
+      : 'All deaths inside the selected range.';
     chart('population-chart', data.daily, ['living'], ['Living'], [colors.teal], row => number(row.day), 'line');
     chart('yearly-chart', data.yearly, ['births', 'deaths'], ['Births', 'Deaths'], [colors.teal, colors.rust], row => `${row.year}`);
     chart('ages-chart', data.ages, ['female', 'male'], ['Female', 'Male'], [colors.teal, colors.gold], row => row.band);
