@@ -10,9 +10,11 @@ async function load(response, options = {}) {
   const requests = [];
   let refresh;
   const timers = new Map();
-  const storage = new Map(options.saved === undefined ? [] : [['first-generation-refresh-minutes', options.saved]]);
+  const storage = new Map(Object.entries(options.preferences || {}));
+  if (options.saved !== undefined) storage.set('first-generation-refresh-minutes', options.saved);
   let nextTimer = 0;
-  const node = () => ({value: '', addEventListener() {}, append() {}, replaceChildren() {}, setAttribute() {},
+  const node = () => ({value: '', style: {setProperty(key,value) {this[key] = value;}}, children: [], attributes: {}, clientWidth: 600, clientHeight: 259,
+    addEventListener() {}, append(...children) {this.children.push(...children);}, replaceChildren(...children) {this.children = children;}, setAttribute(key,value) {this.attributes[key] = value;},
     insertRow() { return {insertCell() { return {}; }}; }});
   const document = {getElementById(id) {
     if (!elements.has(id)) elements.set(id, {...node(), value: id === 'world' ? '1' : id === 'from' ? '0' : '',
@@ -149,4 +151,56 @@ test('invalid or unavailable browser storage falls back to five minutes', async 
     elements.get('refresh').value = '0'; elements.controls.listeners.get('refresh:change')();
     assert.equal(elements.controls.timers.size, 0);
   }
+});
+
+const yearlyReport = async () => {
+  const response = report(10930);
+  const data = await response.json();
+  data.yearly = Array.from({length:30}, (_,i) => ({year:i+1,from_day:i*365+1,to_day:(i+1)*365-(i === 29 ? 20 : 0),births:i+10,deaths:i+2}));
+  data.ages = [{band:'0–9',female:3,male:2}];
+  data.generations = [{generation:1,living:3,deceased:2}];
+  return {ok:true,json:async () => data};
+};
+const bars = element => element.children[0].children.filter(child => Object.hasOwn(child.attributes,'rx'));
+
+test('yearly chart offers wider 10/20/full views and marks incomplete years', async () => {
+  const elements = await load(yearlyReport);
+  const {listeners,requests,storage} = elements.controls;
+  assert.equal(bars(elements.get('yearly-chart')).length, 40);
+  assert.equal(elements.get('yearly-chart').style.minWidth, '1280px');
+  assert.match(elements.get('yearly-caption').textContent, /Years 11–30/);
+  assert.ok(elements.get('yearly-chart').children[0].children.some(child => child.textContent === '30*'));
+  for (const [value,count] of [['10',20],['all',60],['20',40]]) {
+    elements.get('yearly-window').value=value;
+    listeners.get('yearly-window:change')();
+    assert.equal(bars(elements.get('yearly-chart')).length,count);
+    assert.equal(storage.get('first-generation-yearly-window'),value);
+  }
+  elements.get('yearly-bars').value='standard'; listeners.get('yearly-bars:change')();
+  assert.equal(elements.get('yearly-chart').style.minWidth,'800px');
+  assert.equal(elements.get('ages-chart').style.minWidth,undefined);
+  assert.equal(elements.get('generation-chart').style.minWidth,undefined);
+  assert.equal(requests.length,1,'Display choices do not fetch or change the selected data range');
+});
+
+test('colors apply across charts while stripes remain specific to the yearly chart', async () => {
+  const elements = await load(yearlyReport);
+  const yearlyBars=bars(elements.get('yearly-chart'));
+  assert.equal(yearlyBars[0].attributes.fill,'#0072b2');
+  assert.equal(yearlyBars.at(-1).attributes.fill,'url(#yearly-chart-deaths)');
+  assert.deepEqual(bars(elements.get('ages-chart')).map(bar => bar.attributes.fill),['#0072b2','#e69f00']);
+  elements.get('chart-colors').value='contrast'; elements.controls.listeners.get('chart-colors:change')();
+  assert.deepEqual(bars(elements.get('ages-chart')).map(bar => bar.attributes.fill),['#202020','#8a8a8a']);
+  assert.equal(elements.controls.storage.get('first-generation-chart-colors'),'contrast');
+  assert.equal(elements.controls.requests.length,1);
+});
+
+test('graph display preferences restore independently of auto-refresh', async () => {
+  const elements = await load(yearlyReport,{saved:'0',preferences:{
+    'first-generation-chart-colors':'contrast','first-generation-yearly-window':'10','first-generation-yearly-bars':'standard'
+  }});
+  assert.equal(elements.get('chart-colors').value,'contrast');
+  assert.equal(bars(elements.get('yearly-chart')).length,20);
+  assert.equal(elements.get('yearly-chart').style.minWidth,'400px');
+  assert.equal(elements.controls.timers.size,0);
 });
