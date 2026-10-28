@@ -95,26 +95,29 @@ final class ReproductionSystem
             }
         }
 
-        // Check eligibility for existing couples in one query, not by keeping
-        // the entire living population in PHP memory.
-        $eligiblePair = $this->db->prepare(
-            "SELECT COUNT(*) FROM people WHERE world_id=? AND id IN (?,?)
-             AND death_day IS NULL
-             AND (? - birth_day + initial_age_days) >= 18*365
-             AND (? - birth_day + initial_age_days) <=
-                 CASE WHEN sex='female' THEN 45*365 ELSE 65*365 END"
+        // Fetch all currently eligible couples and pregnancy state in one query.
+        // Avoid three round trips per partnership on every simulated day.
+        $eligibleCouples = $this->db->prepare(
+            "SELECT p.mother_id, p.father_id, MAX(pr.conceived_day) AS last_conceived,
+                    SUM(CASE WHEN pr.id IS NOT NULL AND pr.delivered_day IS NULL THEN 1 ELSE 0 END) AS active_pregnancies
+             FROM partnerships p
+             JOIN people m ON m.id=p.mother_id AND m.world_id=p.world_id
+             JOIN people f ON f.id=p.father_id AND f.world_id=p.world_id
+             LEFT JOIN pregnancies pr ON pr.world_id=p.world_id AND pr.mother_id=p.mother_id
+             WHERE p.world_id=? AND p.ended_day IS NULL
+               AND m.death_day IS NULL AND f.death_day IS NULL
+               AND (? - m.birth_day + m.initial_age_days) BETWEEN 18*365 AND 45*365
+               AND (? - f.birth_day + f.initial_age_days) BETWEEN 18*365 AND 65*365
+             GROUP BY p.id,p.mother_id,p.father_id
+             ORDER BY p.id"
         );
-        $active = $this->db->prepare('SELECT COUNT(*) FROM pregnancies WHERE world_id=? AND mother_id=? AND delivered_day IS NULL');
-        $latest = $this->db->prepare('SELECT MAX(conceived_day) FROM pregnancies WHERE world_id=? AND mother_id=?');
+        $eligibleCouples->execute([$worldId,$day,$day]);
         $conceive = $this->db->prepare('INSERT INTO pregnancies(world_id,mother_id,father_id,conceived_day,due_day) VALUES (?,?,?,?,?)');
-        foreach ($pairs as $pair) {
-            $mid = (int)$pair['mother_id']; $fid = (int)$pair['father_id'];
-            $eligiblePair->execute([$worldId,$mid,$fid,$day,$day]);
-            if ((int)$eligiblePair->fetchColumn() !== 2) { continue; }
-            $active->execute([$worldId,$mid]);
-            if ((int)$active->fetchColumn() > 0) { continue; }
-            $latest->execute([$worldId,$mid]);
-            $last = $latest->fetchColumn();
+        while ($pair = $eligibleCouples->fetch(PDO::FETCH_ASSOC)) {
+            $mid = (int)$pair['mother_id'];
+            $fid = (int)$pair['father_id'];
+            if ((int)$pair['active_pregnancies'] > 0) { continue; }
+            $last = $pair['last_conceived'];
             if ($last !== null && $day - (int)$last < 365) { continue; }
             if ($rng->nextInt(100) !== 0) { continue; }
             $conceive->execute([$worldId,$mid,$fid,$day,$day+280]);
