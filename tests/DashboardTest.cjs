@@ -9,6 +9,9 @@ async function load(response, options = {}) {
   const listeners = new Map();
   const requests = [];
   let refresh;
+  const timers = new Map();
+  const storage = new Map(options.saved === undefined ? [] : [['first-generation-refresh-minutes', options.saved]]);
+  let nextTimer = 0;
   const node = () => ({value: '', addEventListener() {}, append() {}, replaceChildren() {}, setAttribute() {},
     insertRow() { return {insertCell() { return {}; }}; }});
   const document = {getElementById(id) {
@@ -21,11 +24,14 @@ async function load(response, options = {}) {
     document, URLSearchParams, AbortController,
     location: {search: options.search || ''}, window: {addEventListener() {}},
     history: {replaceState(a,b,url) { urls.push(url); }},
-    setInterval(callback, delay) { assert.equal(delay, 300000); refresh = callback; },
+    localStorage: {getItem(key) { if (options.storageBlocked) throw new Error('Blocked'); return storage.get(key) ?? null; },
+      setItem(key,value) { if (options.storageBlocked) throw new Error('Blocked'); storage.set(key,value); }},
+    setInterval(callback, delay) { refresh = callback; timers.set(++nextTimer, {callback, delay}); return nextTimer; },
+    clearInterval(id) { timers.delete(id); },
     fetch: async (url, init) => { requests.push({url, signal: init.signal}); return typeof response === 'function' ? response() : response; }
   });
   await new Promise(resolve => setImmediate(resolve));
-  elements.controls = {refresh, requests, listeners, urls, document};
+  elements.controls = {refresh, requests, listeners, urls, document, timers, storage};
   return elements;
 }
 
@@ -108,4 +114,39 @@ test('refresh does not overlap an in-flight request', async () => {
   assert.equal(elements.controls.requests.length, 1);
   assert.equal(elements.controls.requests[0].signal.aborted, false);
   finish(report(10)); await settle();
+});
+
+test('selector replaces the timer and Off disables automatic refresh', async () => {
+  const elements = await load(report(10));
+  const {timers, listeners, storage} = elements.controls;
+  const change = listeners.get('refresh:change');
+  assert.equal([...timers.values()][0].delay, 300000);
+  for (const minutes of ['10','15','5']) {
+    elements.get('refresh').value = minutes; change();
+    assert.equal(timers.size, 1);
+    assert.equal([...timers.values()][0].delay, Number(minutes)*60000);
+    assert.equal(storage.get('first-generation-refresh-minutes'), minutes);
+  }
+  elements.get('refresh').value = '0'; change();
+  assert.equal(timers.size, 0);
+  assert.equal(storage.get('first-generation-refresh-minutes'), '0');
+});
+
+test('saved preference is restored, including Off', async () => {
+  for (const saved of ['0','5','10','15']) {
+    const elements = await load(report(10), {saved});
+    assert.equal(elements.get('refresh').value, saved);
+    assert.equal(elements.controls.timers.size, saved === '0' ? 0 : 1);
+    if (saved !== '0') assert.equal([...elements.controls.timers.values()][0].delay, Number(saved)*60000);
+  }
+});
+
+test('invalid or unavailable browser storage falls back to five minutes', async () => {
+  for (const options of [{saved:'bad'},{storageBlocked:true}]) {
+    const elements = await load(report(10), options);
+    assert.equal(elements.get('refresh').value, '5');
+    assert.equal([...elements.controls.timers.values()][0].delay, 300000);
+    elements.get('refresh').value = '0'; elements.controls.listeners.get('refresh:change')();
+    assert.equal(elements.controls.timers.size, 0);
+  }
 });

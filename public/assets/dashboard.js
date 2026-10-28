@@ -176,8 +176,27 @@
   let resizeTimer;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (loaded) for (const item of charts) item.draw(); }, 120); });
   load();
-  setInterval(() => {
-    // Do not interrupt a request or apply filters the viewer is still editing.
-    if (!document.hidden && !pending && !filtersEdited) load();
-  }, 5 * 60 * 1000);
+  const refreshKey = 'first-generation-refresh-minutes';
+  const intervals = ['0', '5', '10', '15'];
+  let refreshTimer;
+  let refreshMinutes = '5';
+  try {
+    const saved = localStorage.getItem(refreshKey);
+    if (intervals.includes(saved)) refreshMinutes = saved;
+  } catch {} // Refresh still works when browser storage is unavailable.
+  $('refresh').value = refreshMinutes;
+  function scheduleRefresh() {
+    clearInterval(refreshTimer);
+    if ($('refresh').value === '0') return;
+    refreshTimer = setInterval(() => {
+      // Do not interrupt a request or apply filters the viewer is still editing.
+      if (!document.hidden && !pending && !filtersEdited) load();
+    }, Number($('refresh').value) * 60 * 1000);
+  }
+  $('refresh').addEventListener('change', () => {
+    if (!intervals.includes($('refresh').value)) $('refresh').value = '5';
+    try { localStorage.setItem(refreshKey, $('refresh').value); } catch {}
+    scheduleRefresh();
+  });
+  scheduleRefresh();
 })();
