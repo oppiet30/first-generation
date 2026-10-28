@@ -41,6 +41,8 @@ jobs:
         run: find app bin public tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Dashboard JavaScript syntax
         run: node --check public/assets/dashboard.js
+      - name: Dashboard response handling
+        run: node --test tests/DashboardTest.cjs
       - name: Composer and deterministic tests
         run: |
           composer install --no-interaction --no-progress

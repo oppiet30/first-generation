@@ -134,7 +134,17 @@
     loaded = null;
     try {
       const response = await fetch(`api.php?${params}`, {signal: pending.signal, cache: 'no-store'});
-      const data = await response.json();
+      // Apache can return an HTML error page before PHP handles the request.
+      if (!response.ok && !(response.headers.get('content-type') || '').includes('application/json')) {
+        throw new Error(`Statistics server returned HTTP ${response.status}. Try again later; if this continues, check Apache and PHP-FPM on the server.`);
+      }
+      let data;
+      try {
+        data = await response.json();
+      } catch (error) {
+        if (error.name === 'AbortError') throw error;
+        throw new Error('The statistics server returned an invalid response. Check the API configuration and server logs.');
+      }
       if (!response.ok) throw new Error(data.error || 'Statistics could not be loaded.');
       if (id !== requestNumber) return;
       if (reset) $('from').value = 0;
