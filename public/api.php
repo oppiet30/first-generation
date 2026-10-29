@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+$requestStarted = hrtime(true);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use FirstGeneration\Infrastructure\Database;
@@ -47,6 +48,11 @@ try {
     fail(500,'Statistics could not be loaded. Check the server log.');
 }
 if ($format === 'json') {
+    $report['meta'] = [
+        'generation_ms'=>round((hrtime(true)-$requestStarted)/1000000,2),
+        'peak_memory_bytes'=>memory_get_peak_usage(true),
+        'generated_at'=>gmdate('c')
+    ];
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($report,JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;

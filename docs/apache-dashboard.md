@@ -77,6 +77,14 @@ The browser error-handling change does not restore an unavailable PHP service.
 
 ## Large populations and PHP memory
 
+A status line below the statistics shows the world and end day, total people
+recorded, server generation time, total browser loading time, peak PHP memory,
+and the update timestamp in the viewer's local time. Server generation measures
+PHP work through report creation, excluding JSON encoding and browser rendering.
+Total loading measures the statistics request through chart rendering, not the
+initial HTML navigation. Each successful refresh replaces these values; a failed
+refresh hides them rather than showing old timings for a failed request.
+
 **Graph colors** switches every graph between blue/orange and black/gray while
 keeping the non-yearly graph layouts unchanged. The births-and-deaths chart has
 its own **Bar width** (Standard/Wide) and **Years shown** (last 10, last 20, or full

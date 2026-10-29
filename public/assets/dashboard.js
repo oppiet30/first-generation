@@ -177,6 +177,7 @@
     }
   }
   async function load(reset = false) {
+    const started = performance.now();
     const id = ++requestNumber;
     if (pending) pending.abort();
     pending = new AbortController();
@@ -185,6 +186,7 @@
     $('apply').disabled = true; $('message').textContent = 'Loading statistics…'; $('message').className = 'message';
     // Hide the previous world/range rather than showing stale graphs beside changed filters.
     $('results').hidden = true;
+    $('generation-info').hidden = true;
     loaded = null;
     try {
       const response = await fetch(`api.php?${params}`, {signal: pending.signal, cache: 'no-store'});
@@ -203,6 +205,15 @@
       if (id !== requestNumber) return;
       if (reset) { $('from').value = 0; $('to').value = ''; }
       render(data); $('message').textContent = '';
+      const details = [`World ${data.world.id} · day ${number(data.to)}`, `${number(data.summary.total_people)} people recorded`];
+      if (Number.isFinite(data.meta?.generation_ms)) details.push(`Server generation: ${(data.meta.generation_ms/1000).toFixed(2)} s`);
+      details.push(`Total loading: ${((performance.now()-started)/1000).toFixed(2)} s`);
+      if (Number.isFinite(data.meta?.peak_memory_bytes)) details.push(`Peak PHP memory: ${(data.meta.peak_memory_bytes/1048576).toFixed(1)} MiB`);
+      let updated = new Date(data.meta?.generated_at || Date.now());
+      if (Number.isNaN(updated.getTime())) updated = new Date();
+      details.push(`Updated: ${updated.toLocaleString()}`);
+      $('generation-info').textContent = details.join(' · ');
+      $('generation-info').hidden = false;
       const urlParams = new URLSearchParams({world: data.world.id, from: data.from});
       if (params.has('to')) urlParams.set('to', data.to);
       history.replaceState(null, '', `?${urlParams}`);
