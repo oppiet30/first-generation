@@ -45,8 +45,10 @@ final class PopulationStatistics
             if ($from < 0 || $from > $to || $to > (int)$world['current_day']) {
                 throw new InvalidArgumentException('Choose days between 0 and the current world day, with From no later than To.');
             }
-            // A disk-backed spool permits two passes without retaining every
+            // Count changes while streaming, then spool for the remaining pass without retaining every
             // person (or PDO's buffered result) in PHP memory.
+            $changes = [];
+            $ancestry = new StatisticsAncestry();
             $people = $spool();
             $buffered = $this->db->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
             $this->db->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
@@ -55,6 +57,16 @@ final class PopulationStatistics
                 $q->execute([$worldId]);
                 while ($p = $q->fetch()) {
                     $append($people,$p);
+                    $ancestry->add((int)$p['id'],(int)$p['mother_id'],(int)$p['father_id']);
+                    $day = (int)$p['birth_day'];
+                    $changes[$day]['added'] = ($changes[$day]['added'] ?? 0) + 1;
+                    if ($p['mother_id'] !== null) { $changes[$day]['births'] = ($changes[$day]['births'] ?? 0) + 1; }
+                    if ($p['death_day'] !== null) {
+                        $day = (int)$p['death_day'];
+                        $changes[$day]['deaths'] = ($changes[$day]['deaths'] ?? 0) + 1;
+                        $cause = in_array($p['cause'],['natural','childbirth'],true) ? $p['cause'] : 'other';
+                        $changes[$day][$cause] = ($changes[$day][$cause] ?? 0) + 1;
+                    }
                 }
             } finally {
                 $q->closeCursor();
@@ -71,20 +83,6 @@ final class PopulationStatistics
         $world['id'] = (int)$world['id'];
         $world['current_day'] = (int)$world['current_day'];
         $rows = static fn(): \Generator => $read($people);
-        $changes = [];
-        $ancestry = new StatisticsAncestry();
-        foreach ($rows() as $p) {
-            $ancestry->add((int)$p['id'],(int)$p['mother_id'],(int)$p['father_id']);
-            $day = (int)$p['birth_day'];
-            $changes[$day]['added'] = ($changes[$day]['added'] ?? 0) + 1;
-            if ($p['mother_id'] !== null) { $changes[$day]['births'] = ($changes[$day]['births'] ?? 0) + 1; }
-            if ($p['death_day'] !== null) {
-                $day = (int)$p['death_day'];
-                $changes[$day]['deaths'] = ($changes[$day]['deaths'] ?? 0) + 1;
-                $cause = in_array($p['cause'],['natural','childbirth'],true) ? $p['cause'] : 'other';
-                $changes[$day][$cause] = ($changes[$day][$cause] ?? 0) + 1;
-            }
-        }
         $daily = $stream ? $spool() : [];
         $yearly = [];
         $dailyStep = $dashboard ? max(1,(int)ceil(($to-$from)/1999)) : 1;
