@@ -23,7 +23,7 @@ async function load(response, options = {}) {
   }, createElementNS: node, createElement: node, querySelectorAll: () => [], hidden: false};
   const urls = [];
   vm.runInNewContext(source, {
-    document, URLSearchParams, AbortController,
+    document, URLSearchParams, AbortController, performance: {now: () => options.now ? options.now() : 0},
     location: {search: options.search || ''}, window: {addEventListener() {}},
     history: {replaceState(a,b,url) { urls.push(url); }},
     localStorage: {getItem(key) { if (options.storageBlocked) throw new Error('Blocked'); return storage.get(key) ?? null; },
@@ -72,7 +72,7 @@ test('network failure retains the connection guidance', async () => {
 
 const report = day => ({ok: true, json: async () => ({
   world: {id: 1, name: 'Genesis World', current_day: day, status: 'running'}, from: 0, to: day,
-  summary: {living: 2, births: 0, deaths: 0, generations: 1, range_births: 0, range_deaths: 0},
+  summary: {living: 2, births: 0, deaths: 0, generations: 1, range_births: 0, range_deaths: 0,total_people:2},
   daily: [], yearly: [], ages: [], death_ages: [], infants: [], generations: [], deaths: [], events: []
 })});
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -203,4 +203,29 @@ test('graph display preferences restore independently of auto-refresh', async ()
   assert.equal(bars(elements.get('yearly-chart')).length,20);
   assert.equal(elements.get('yearly-chart').style.minWidth,'400px');
   assert.equal(elements.controls.timers.size,0);
+});
+
+test('generation footer distinguishes server duration, loading duration and memory', async () => {
+  const data = await report(70000).json();
+  data.meta = {generation_ms:33610,peak_memory_bytes:28940697,generated_at:'2026-10-29T18:00:00+00:00'};
+  let clock = 0;
+  const elements = await load({ok:true,json:async () => data},{now:() => {const result=clock; clock+=36000; return result;}});
+  const footer = elements.get('generation-info');
+  assert.equal(footer.hidden,false);
+  assert.match(footer.textContent,/Server generation: 33.61 s/);
+  assert.match(footer.textContent,/Total loading: 36.00 s/);
+  assert.match(footer.textContent,/Peak PHP memory: 27.6 MiB/);
+  assert.match(footer.textContent,/day 70,000/);
+  assert.match(footer.textContent,/2 people recorded/);
+  assert.match(footer.textContent,/Updated:/);
+});
+
+test('generation footer is hidden when a refresh fails and supports older APIs', async () => {
+  let failed = false;
+  const elements = await load(() => failed ? {ok:false,headers:{get:()=>'application/json'},json:async () => ({error:'Unavailable'})} : report(10));
+  const footer=elements.get('generation-info');
+  assert.equal(footer.hidden,false);
+  assert.doesNotMatch(footer.textContent,/NaN|undefined|Server generation|Peak PHP memory/);
+  failed = true; elements.controls.refresh(); await settle();
+  assert.equal(footer.hidden,true);
 });

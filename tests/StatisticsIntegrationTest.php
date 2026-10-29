@@ -99,6 +99,10 @@ try {
     };
     [$code,$body]=$get('api.php?world='.$world.'&from=2&to=3');
     demand($code === 200 && json_decode($body,true,512,JSON_THROW_ON_ERROR)['summary']['range_births'] === 2,'JSON API serves selected range');
+    $meta = json_decode($body,true,512,JSON_THROW_ON_ERROR)['meta'];
+    demand(is_numeric($meta['generation_ms']) && $meta['generation_ms'] >= 0,'API returns server generation duration');
+    demand(is_int($meta['peak_memory_bytes']) && $meta['peak_memory_bytes'] > 0,'API returns peak PHP memory');
+    demand(strtotime($meta['generated_at']) !== false,'API returns a valid generation timestamp');
     foreach(['daily','people','yearly','ages','death_ages','infants','generations','deaths'] as $report) {
         [$code,$body,$headers]=$get('api.php?world='.$world.'&format=csv&report='.$report);
         demand($code === 200 && strlen($body)>10 && str_contains(implode(' ',$headers),'attachment; filename='),'CSV download '.$report);
