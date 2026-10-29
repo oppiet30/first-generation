@@ -96,8 +96,10 @@ requests and pauses while filters have unapplied edits. Full history returns to
 day zero with no fixed end day.
 
 Statistics read population rows with an unbuffered PDO cursor into a private
-temporary file. Compact parent IDs support genealogy calculations without keeping
-every person's full database row in memory. The operating system's temporary
+temporary file. A second temporary file holds parent IDs in fixed-size records;
+the generation cache uses four bytes per ID position instead of PHP hash tables.
+Its offsets start at the first ID in the world, avoiding allocations for earlier
+worlds. Missing parents and ancestry cycles are still rejected. The operating system's temporary
 directory must have enough free disk space; PHP removes the temporary files when
 they close or the request ends. Failure to create or write a spool returns the
 normal logged API error instead of an incomplete report.
@@ -109,9 +111,11 @@ generation totals still include all applicable records. Both range endpoints
 are shown. CSV downloads keep every day, person and death, using disk-backed
 iterables rather than collecting all export rows in PHP arrays.
 
-Regression tests cover 420,000 people and 100,000 days under a 128 MiB PHP limit.
-Memory still grows with the compact ancestry index and the number of distinct
-event days; this is a reduction in memory use, not unlimited population capacity.
+Regression tests cover 2,500,000 people and 100,000 days under a 128 MiB PHP limit.
+Memory still grows with the span of IDs within the world (including gaps) and
+the number of distinct event days; this is a reduction in memory use, not
+unlimited population capacity. Parent records use 16 bytes per ID position on
+temporary disk in addition to the population spool and any export spools.
 
 ## Rollback
 
