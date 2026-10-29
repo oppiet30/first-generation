@@ -17,6 +17,11 @@
   const charts = [];
   function chart(id, rows, keys, labels, palette, label, kind = 'bar', patterned = false) {
     const container = $(id);
+    const ageCounts = id === 'ages-chart';
+    const valueLabel = (row, key) => {
+      const total = ageCounts ? Number(row.female) + Number(row.male) : 0;
+      return number(row[key]) + (ageCounts ? ` (${total ? (Number(row[key]) / total * 100).toFixed(1) : '0.0'}%)` : '');
+    };
     let selected = -1;
     function draw() {
       const highContrast = $('chart-colors').value === 'contrast';
@@ -25,8 +30,12 @@
       const deathOnly = id === 'death-chart' || id === 'infant-chart';
       palette = deathOnly ? [displayColors[1]] : displayColors;
       if (id === 'yearly-chart') container.style.minWidth = `${Math.max(260, rows.length * (wide ? 64 : 40))}px`;
+      if (ageCounts) {
+        const digits = rows.reduce((max,row) => Math.max(max,number(row.female).length,number(row.male).length),1);
+        container.style.minWidth = `${Math.max(260, rows.length * Math.max(70,digits*7+12)+53)}px`;
+      }
       const width = Math.max(container.clientWidth, 260), height = container.clientHeight || 259;
-      const left = 39, right = 14, top = 24, bottom = 41;
+      const left = 39, right = 14, top = ageCounts ? 44 : 24, bottom = 41;
       const plotWidth = width - left - right, plotHeight = height - top - bottom;
       const svg = svgElement('svg', {viewBox: `0 0 ${width} ${height}`, 'aria-hidden': 'true'});
       if (patterned) {
@@ -67,8 +76,15 @@
             const rect = svgElement('rect', {x: x(index) - barWidth * keys.length / 2 + series * barWidth,
               y: y(Number(row[key])), width: Math.max(1, barWidth - 2), height: y(0) - y(Number(row[key])),
               fill: patterned && (series === 1 || deathOnly) ? `url(#${id}-deaths)` : palette[series], rx: 1});
-            rect.append(svgElement('title', {}, `${label(row)} · ${labels[series]}: ${number(row[key])}`));
+            rect.append(svgElement('title', {}, `${label(row)} · ${labels[series]}: ${valueLabel(row,key)}`));
             svg.append(rect);
+            if (ageCounts) {
+              const labelTop = Math.min(...keys.map(item => y(Number(row[item]))));
+              svg.append(svgElement('text', {
+                x: x(index) - barWidth * keys.length / 2 + series * barWidth + Math.max(1,barWidth-2)/2,
+                y: labelTop - (series === 0 ? 22 : 6), 'text-anchor': 'middle', class: 'age-bar-count'
+              },number(row[key])));
+            }
           });
         }
       });
@@ -86,14 +102,16 @@
         if (!rows.length) return;
         selected = Math.max(0, Math.min(rows.length - 1, index));
         const row = rows[selected];
-        tooltip.textContent = `${kind === 'line' ? 'Day ' : ''}${label(row)}\n${keys.map((key, i) => `${labels[i]}: ${number(row[key])}`).join(' · ')}`;
+        tooltip.textContent = `${kind === 'line' ? 'Day ' : ''}${label(row)}\n${keys.map((key, i) => `${labels[i]}: ${valueLabel(row,key)}`).join(' · ')}`;
         tooltip.hidden = false; guide.setAttribute('x1', x(selected)); guide.setAttribute('x2', x(selected)); guide.setAttribute('opacity', '0.35');
       }
-      svg.addEventListener('pointermove', event => {
+      const inspectPointer = event => {
         const rect = svg.getBoundingClientRect();
         const fraction = ((event.clientX - rect.left) / rect.width * width - left) / plotWidth;
         inspect(kind === 'line' ? Math.round(fraction * (rows.length - 1)) : Math.floor(fraction * rows.length));
-      });
+      };
+      svg.addEventListener('pointermove', inspectPointer);
+      svg.addEventListener('pointerdown', inspectPointer);
       container.onkeydown = event => {
         const actions = {ArrowLeft: selected - 1, ArrowRight: selected + 1, Home: 0, End: rows.length - 1};
         if (Object.hasOwn(actions, event.key)) { event.preventDefault(); inspect(actions[event.key]); }

@@ -178,7 +178,7 @@ test('yearly chart offers wider 10/20/full views and marks incomplete years', as
   }
   elements.get('yearly-bars').value='standard'; listeners.get('yearly-bars:change')();
   assert.equal(elements.get('yearly-chart').style.minWidth,'800px');
-  assert.equal(elements.get('ages-chart').style.minWidth,undefined);
+  assert.equal(elements.get('ages-chart').style.minWidth,'260px');
   assert.equal(elements.get('generation-chart').style.minWidth,undefined);
   assert.equal(requests.length,1,'Display choices do not fetch or change the selected data range');
 });
@@ -203,4 +203,22 @@ test('graph display preferences restore independently of auto-refresh', async ()
   assert.equal(bars(elements.get('yearly-chart')).length,20);
   assert.equal(elements.get('yearly-chart').style.minWidth,'400px');
   assert.equal(elements.controls.timers.size,0);
+});
+
+test('age bars show exact counts and within-band percentages on keyboard inspection', async () => {
+  const response = await yearlyReport();
+  const data = await response.json();
+  data.ages = [{band:'0–9',female:133800,male:134200},{band:'10–19',female:0,male:0}];
+  const elements = await load({ok:true,json:async () => data});
+  const chart = elements.get('ages-chart');
+  const labels = chart.children[0].children.filter(node => node.attributes.class === 'age-bar-count');
+  assert.deepEqual(labels.map(node => node.textContent),['133,800','0','134,200','0']);
+  assert.notEqual(labels[0].attributes.y,labels[2].attributes.y,'Paired count labels are staggered');
+  chart.onkeydown({key:'Home',preventDefault() {}});
+  assert.match(chart.children[1].textContent,/Female: 133,800 \(49.9%\)/);
+  assert.match(chart.children[1].textContent,/Male: 134,200 \(50.1%\)/);
+  chart.onkeydown({key:'End',preventDefault() {}});
+  assert.match(chart.children[1].textContent,/Female: 0 \(0.0%\)/);
+  assert.doesNotMatch(chart.children[1].textContent,/NaN|Infinity/);
+  assert.equal(elements.get('yearly-chart').children[0].children.filter(node => node.attributes.class === 'age-bar-count').length,0);
 });
