@@ -71,11 +71,10 @@ final class PopulationStatistics
         $world['id'] = (int)$world['id'];
         $world['current_day'] = (int)$world['current_day'];
         $rows = static fn(): \Generator => $read($people);
-        $changes = $byId = [];
+        $changes = [];
+        $ancestry = new StatisticsAncestry();
         foreach ($rows() as $p) {
-            // Only parent IDs are needed for ancestry; two packed 64-bit IDs
-            // use far less memory than retaining each full associative row.
-            $byId[(int)$p['id']] = pack('JJ',(int)$p['mother_id'],(int)$p['father_id']);
+            $ancestry->add((int)$p['id'],(int)$p['mother_id'],(int)$p['father_id']);
             $day = (int)$p['birth_day'];
             $changes[$day]['added'] = ($changes[$day]['added'] ?? 0) + 1;
             if ($p['mother_id'] !== null) { $changes[$day]['births'] = ($changes[$day]['births'] ?? 0) + 1; }
@@ -118,21 +117,6 @@ final class PopulationStatistics
             ['Under 1 year','1–4','5–17','18–34','35–49','50–64','65–79','80+']);
         $infants = array_map(static fn(string $label): array => ['band'=>$label,'count'=>0],
             ['0–29 days','30–89 days','90–179 days','180–364 days']);
-        $generationCache = $visiting = [];
-        $generation = function (int $id) use (&$generation,&$generationCache,&$visiting,$byId): int {
-            if (isset($generationCache[$id])) { return $generationCache[$id]; }
-            if (isset($visiting[$id])) { throw new RuntimeException('Genealogy contains a cycle'); }
-            $visiting[$id] = true;
-            $parentDepths = [];
-            foreach (unpack('Jmother/Jfather',$byId[$id]) as $parent) {
-                if ($parent !== 0) {
-                    if (!isset($byId[(int)$parent])) { throw new RuntimeException('Parent missing from world'); }
-                    $parentDepths[] = $generation((int)$parent);
-                }
-            }
-            unset($visiting[$id]);
-            return $generationCache[$id] = $parentDepths ? 1+max($parentDepths) : 1;
-        };
         $generations = [];
         $deathRecords = $stream ? $spool() : [];
         $personRows = $stream ? $spool() : [];
@@ -141,7 +125,7 @@ final class PopulationStatistics
             $dead = $p['death_day'] !== null && (int)$p['death_day'] <= $to;
             $age = max(0,($dead ? (int)$p['death_day'] : $to)-(int)$p['birth_day']+(int)$p['initial_age_days']);
             $years = intdiv($age,365);
-            $gen = $generation((int)$p['id']);
+            $gen = $ancestry->generation((int)$p['id']);
             $generations[$gen] ??= ['generation'=>$gen,'living'=>0,'deceased'=>0];
             $generations[$gen][$dead ? 'deceased' : 'living']++;
             if (!$dashboard) $append($personRows,['world_id'=>$worldId,'person_id'=>(int)$p['id'],'name'=>$p['name'],'sex'=>$p['sex'],
@@ -158,7 +142,7 @@ final class PopulationStatistics
         }
         ksort($generations);
         fclose($people);
-        $generation = null; // Release the self-referencing closure and ancestry cache.
+        unset($ancestry);
         return ['world'=>$world,'from'=>$from,'to'=>$to,'summary'=>['living'=>$living,'births'=>$births,'deaths'=>$deaths,
             'total_people'=>$total,'generations'=>count($generations),'range_births'=>$rangeBirths,'range_deaths'=>$rangeDeaths],
             'daily'=>$result($daily),'yearly'=>array_values($yearly),'ages'=>$ages,'death_ages'=>$deathAges,'infants'=>$infants,
