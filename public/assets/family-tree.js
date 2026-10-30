@@ -32,7 +32,6 @@
     svg.replaceChildren();
     if (!current || !center || el('family-view').hidden) return;
     const bounds=canvas.getBoundingClientRect(), scale=Number(el('tree-zoom').value);
-    svg.setAttribute('width',canvas.offsetWidth); svg.setAttribute('height',canvas.offsetHeight);
     const point=(node,bottom) => {const r=node.getBoundingClientRect();return [(r.left+r.width/2-bounds.left)/scale,((bottom?r.bottom:r.top)-bounds.top)/scale];};
     const connect=(a,b) => {const path=document.createElementNS('http://www.w3.org/2000/svg','path');const y=(a[1]+b[1])/2;path.setAttribute('d',`M ${a[0]} ${a[1]} V ${y} H ${b[0]} V ${b[1]}`);svg.append(path);};
     el('tree-parents').querySelectorAll('.person-card').forEach(node=>connect(point(node,true),point(center,false)));
