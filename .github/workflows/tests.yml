@@ -40,7 +40,9 @@ jobs:
       - name: PHP syntax
         run: find app bin public tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Dashboard JavaScript syntax
-        run: node --check public/assets/dashboard.js
+        run: |
+          node --check public/assets/dashboard.js
+          node --check public/assets/family-tree.js
       - name: Dashboard response handling
         run: node --test tests/DashboardTest.cjs
       - name: Large dashboard memory regression
@@ -60,6 +62,7 @@ jobs:
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/004_partnerships.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/005_relationship_settings.sql
           mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/006_mortality.sql
+          mariadb -h 127.0.0.1 -u fg_app -ptest-password first_generation < database/migrations/007_family_search.sql
           php bin/create-world.php "Genesis World" 1337
           php tests/CreateWorldIntegrationTest.php
           php tests/WorldHistoryIntegrationTest.php
@@ -67,6 +70,7 @@ jobs:
           php tests/StatisticsIntegrationTest.php
           php bin/family-tree.php 1
           php tests/FamilyTreeIntegrationTest.php
+          php tests/FamilyTreeViewIntegrationTest.php
           php tests/MortalityIntegrationTest.php
           php tests/MortalityPartnershipIntegrationTest.php
           test "$(mariadb -N -h 127.0.0.1 -u fg_app -ptest-password first_generation -e 'SELECT COUNT(*) FROM world_relationship_settings WHERE allow_parent_child_partnerships=1')" = 0

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Keep PHP's development-server index fallback from serving unknown paths.
 $path = parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
-if (in_array($path,['/','/index.html','/api.php','/assets/dashboard.js','/assets/dashboard.css'],true)) {
+if (in_array($path,['/','/index.html','/api.php','/family-tree.html','/family-api.php','/assets/dashboard.js','/assets/dashboard.css','/assets/family-tree.js','/assets/family-tree.css'],true)) {
     return false;
 }
 http_response_code(404);

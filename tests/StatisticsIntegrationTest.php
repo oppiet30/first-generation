@@ -98,6 +98,22 @@ try {
         return [(int)$match[1],$body,$http_response_header];
     };
     [$code,$body]=$get('api.php?world='.$world.'&from=2&to=3');
+    [$familyCode,$familyBody]=$get('family-api.php?world='.$world.'&person='.$child);
+    $family = json_decode($familyBody,true,512,JSON_THROW_ON_ERROR);
+    demand($familyCode === 200 && $family['person']['id'] === $child,'Family API selects exact person');
+    demand(count($family['parents']) === 2 && count($family['children']) === 1,'Family API connects both parents and child');
+    demand($family['person']['name'] === '<script>literal</script>','Names remain literal data');
+    [$familyCode,$familyBody]=$get('family-api.php?world='.$empty.'&person='.$child);
+    demand($familyCode === 404,'Family lookup cannot cross worlds');
+    [$familyCode,$familyBody]=$get('family-api.php?world='.$world.'&search=Ad');
+    demand($familyCode === 200 && count(json_decode($familyBody,true)['matches']) === 1,'Name prefix search');
+    [$familyCode,$familyBody]=$get('family-api.php?world='.$world.'&search=%25');
+    demand($familyCode === 200 && json_decode($familyBody,true)['matches'] === [],'Search wildcard is literal');
+    foreach(['world[]=1','world=0','person=-1','after=-1','search[]=Adam'] as $query) {
+        [$familyCode]=$get('family-api.php?'.$query); demand($familyCode === 400,'Family API validates '.$query);
+    }
+    [$familyCode]=$get('family-api.php','POST'); demand($familyCode === 405,'Family API rejects writes');
+    [$familyCode,$familyBody]=$get('family-tree.html'); demand($familyCode === 200 && str_contains($familyBody,'family-tree.js'),'Separate family page serves');
     demand($code === 200 && json_decode($body,true,512,JSON_THROW_ON_ERROR)['summary']['range_births'] === 2,'JSON API serves selected range');
     $meta = json_decode($body,true,512,JSON_THROW_ON_ERROR)['meta'];
     demand(is_numeric($meta['generation_ms']) && $meta['generation_ms'] >= 0,'API returns server generation duration');

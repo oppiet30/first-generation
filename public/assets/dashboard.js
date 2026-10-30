@@ -147,6 +147,7 @@
   }
   function render(data) {
     loaded = data; charts.length = 0;
+    $('family-link').href = `family-tree.html?world=${encodeURIComponent(data.world.id)}`;
     const palette = $('chart-colors').value === 'contrast' ? ['#202020', '#8a8a8a'] : ['#0072b2', '#e69f00'];
     $('results').style.setProperty('--birth-color', palette[0]);
     $('results').style.setProperty('--death-color', palette[1]);
